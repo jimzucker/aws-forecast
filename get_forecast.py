@@ -26,14 +26,16 @@ under the License.
 """
 
 import argparse
-import os
 import sys
 import logging
 import boto3
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
+from botocore.exceptions import ClientError
+import json
+from urllib.request import Request, urlopen
+from urllib.error import URLError, HTTPError
 
-# noinspection All
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(threadName)s] [%(levelname)s] %(message)s",
@@ -87,11 +89,13 @@ def get_secret(client, secret_name):
         # Secrets Manager decrypts the secret value using the associated KMS CMK
         # Depending on whether the secret was a string or binary, only one of these fields will be populated
         if 'SecretString' in get_secret_value_response:
-            text_secret_data = get_secret_value_response['SecretString']
+            text_secret_data = json.loads(get_secret_value_response['SecretString']).get('slack_url')
         else:
-            binary_secret_data = get_secret_value_response['SecretBinary']
+            #binary_secret_data = get_secret_value_response['SecretBinary']
+            logger.error("Binary Secrets not supported")
 
         # Your code goes here.
+    return text_secret_data
 
 #
 # Calculates forecast, ignoring credits
@@ -203,12 +207,27 @@ def calc_forecast(costs_explorer_client):
 
 def display_output(forecast_slack_url,message):
     if forecast_slack_url != "":
-        logger.info("slack" + message)
+        send_slack(forecast_slack_url, message)
     else:
         logger.info(message)
-     
 
-def main():
+def send_slack(slack_hook_url, message):
+    slack_message = {
+        'text': message
+    }
+
+    req = Request(slack_hook_url, json.dumps(slack_message).encode('utf-8'))
+
+    try:
+        response = urlopen(req)
+        response.read()
+        logger.debug("Message posted to slack")
+    except HTTPError as e:
+        logger.error("Request failed: %d %s", e.code, e.reason)
+    except URLError as e:
+        logger.error("Server connection failed: %s", e.reason)
+
+def get_forecast():
     try:
         cmdline_params = arg_parser()
         boto3_session = boto3.Session(profile_name=cmdline_params.profile)
@@ -216,9 +235,9 @@ def main():
 
         forecast_slack_url=""
         try:
-            secrets_manager_client = session.client('secretsmanager')
-            forecast_slack_url=get_secret(secrets_manager_client, "awsgenie:forecast_slack_url")
-        except Exception:
+            secrets_manager_client = boto3_session.client('secretsmanager')
+            forecast_slack_url='https://' + get_secret(secrets_manager_client, "awsgenie_forecast_slack_url")
+        except Exception as e:
             logger.warning("Disabling Slack URL not found")
 
         if cmdline_params.type in ['FORECAST']:
@@ -240,4 +259,4 @@ def main():
     sys.exit(0)
 
 if __name__ == '__main__':
-    main()
+    get_forecast()

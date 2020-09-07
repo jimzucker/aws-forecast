@@ -11,6 +11,7 @@ So I set out to automate this as a slack post daily to save time.  While doing t
 1. Numbers generated include percent change must be consistent with the numbers in Cost Explorer UI.
 2. Application must produce a cleanly formatted one line output.
 3. Code must be written as python functions that we can re-use to integrate into a slack-bot.
+4. Post to slack if url is defined as an AWS secret (see below)
 
 # Technical Notes
 
@@ -19,6 +20,18 @@ So I set out to automate this as a slack post daily to save time.  While doing t
 
 ### Sample Output
 ![Sample Output of get_forecast](https://github.com/jimzucker/aws-forecast/blob/master/images/get_forecast_sample_output.png)
+
+### Enabling Slack
+To enable posting the message to slack instead of outputing to the command line you must define a secret in secrets manager called 'awsgenie_forecast_slack_url' with key=slack_url and value=<slack url>, if this secret is not found then the output is to the console.
+
+![Sample Output of get_forecast](https://github.com/jimzucker/aws-forecast/blob/master/images/aws_secret.png)
+
+
+#### SSL Errors posting message to slack
+If you get SSL Cert errors defining this environment varialbe may help you:
+```
+export SSL_CERT_FILE=$(python -m certifi)
+```
 
 ### AWS API Used
 1. get_cost_forecast - used to get current month forecast. (note we exclude credits)
