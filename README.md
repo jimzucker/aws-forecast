@@ -12,8 +12,7 @@ So I set out to automate this as a slack post daily to save time.  While doing t
 2. Application must produce a cleanly formatted one line output.
 3. Code must be written as python functions that we can re-use to integrate into a slack-bot.
 4. Post to slack if url is defined as an AWS secret (see below)
-
-# Technical Notes
+5. Provide example Lambda function that posts to slack on a cron 1 time per day
 
 ### Command line
 ```python3 get_forecast.py --profile <aws profile>  --type [FORECAST | ACTUALS]```
@@ -24,8 +23,21 @@ So I set out to automate this as a slack post daily to save time.  While doing t
 ### Enabling Slack
 To enable posting the message to slack instead of outputing to the command line you must define a secret in secrets manager called 'awsgenie_forecast_slack_url' with key=slack_url and value=<slack url>, if this secret is not found then the output is to the console.
 
-![Sample Output of get_forecast](https://github.com/jimzucker/aws-forecast/blob/master/images/aws_secret.png)
+![Enabling Slack](https://github.com/jimzucker/aws-forecast/blob/master/images/aws_secret.png)
 
+### Setting up Lambda
+There are 3 parts to configuring this to run as a Lambda
+1. IAM Role for Lambda - The IAM Role for you Lambda will have to give permissions for Lambda and Cost Explorer.
+2. Trigger - Event Bridge(Cloudwatch Alarms) setup with a cron expression to trigger a run daily.
+3. Function Code - You can directly paste in the get_forecast.py file is is all ready to go.
+
+[Click here for instructions for setting up Lambda](https://github.com/jimzucker/aws-forecast/blob/master/LAMBDA_README.md)
+
+# AWS Architecture
+![AWS Architecture](https://github.com/jimzucker/aws-forecast/blob/master/images/aws_architecture.png)
+
+
+# Technical Notes
 
 #### SSL Errors posting message to slack
 If you get SSL Cert errors defining this environment varialbe may help you:
@@ -43,6 +55,5 @@ In testing I found several situations where the calls to get_cost_forecast would
 2. Failure on new accounts or start of the month - on some days the calc fails due to insufficient data and we have to fall back to actuals
 
 # Backlog
-1. Add example Lambda function that posts to slack on a cron 1 time per day
-2. Deploy the whole thing as infrastructure as code with Cloud Formation
+1. Deploy the whole thing as infrastructure as code with Cloud Formation
 

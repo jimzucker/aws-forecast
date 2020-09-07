@@ -36,16 +36,12 @@ import json
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(threadName)s] [%(levelname)s] %(message)s",
-    handlers=[
-        logging.FileHandler("info.log"),
-        logging.StreamHandler()
-    ])
+# Initialize you log configuration using the base class
+logging.basicConfig(level = logging.INFO)
 
+# Retrieve the logger instance
 logger = logging.getLogger()
-
+    
 
 def arg_parser():
     """Extracts various arguments from command line
@@ -75,6 +71,7 @@ def arg_parser():
 
 def get_secret(client, secret_name):
     try:
+        text_secret_data = ""
         get_secret_value_response = client.get_secret_value(
             SecretId=secret_name
         )
@@ -208,8 +205,7 @@ def calc_forecast(costs_explorer_client):
 def display_output(forecast_slack_url,message):
     if forecast_slack_url != "":
         send_slack(forecast_slack_url, message)
-    else:
-        logger.info(message)
+    print(message)
 
 def send_slack(slack_hook_url, message):
     slack_message = {
@@ -227,29 +223,38 @@ def send_slack(slack_hook_url, message):
     except URLError as e:
         logger.error("Server connection failed: %s", e.reason)
 
-def get_forecast():
+def get_forecast(boto3_session, type):
+    print(boto3_session)
+    forecast_slack_url=""
+    try:
+        secrets_manager_client = boto3_session.client('secretsmanager')
+        forecast_slack_url='https://' + get_secret(secrets_manager_client, "awsgenie_forecast_slack_url")
+    except Exception as e:
+        logger.warning("Disabling Slack URL not found")
+        print(e)
+        
+    costs_explorer_client = boto3_session.client('ce')
+    if type in ['FORECAST']:
+        forecast = calc_forecast(costs_explorer_client)
+        display_output(forecast_slack_url, forecast)
+    elif type in ['ACTUALS']:
+        raise Exception("not implimented - ACTUALS")
+        actuals = calc_forecast(costs_explorer_client)
+        display_output(forecast_slack_url, actuals)
+    else:
+        raise Exception("Invalid run type: cmdline_params.type . Please choose from: FORECAST, ACTUALS")
+
+    return forecast
+
+def lambda_handler(event, context):
+    logger.info("Event: " + str(event))
+    get_forecast(boto3, "FORECAST")
+
+def main():
     try:
         cmdline_params = arg_parser()
         boto3_session = boto3.Session(profile_name=cmdline_params.profile)
-        costs_explorer_client = boto3_session.client('ce')
-
-        forecast_slack_url=""
-        try:
-            secrets_manager_client = boto3_session.client('secretsmanager')
-            forecast_slack_url='https://' + get_secret(secrets_manager_client, "awsgenie_forecast_slack_url")
-        except Exception as e:
-            logger.warning("Disabling Slack URL not found")
-
-        if cmdline_params.type in ['FORECAST']:
-            forecast = calc_forecast(costs_explorer_client)
-            display_output(forecast_slack_url, forecast)
-        elif cmdline_params.type in ['ACTUALS']:
-            raise Exception("not implimented - ACTUALS")
-            actuals = calc_forecast(costs_explorer_client)
-            display_output(forecast_slack_url, actuals)
-        else:
-            print("Invalid run type: cmdline_params.type . Please choose from: FORECAST, ACTUALS")
-            sys.exit(1)
+        get_forecast(boto3_session, cmdline_params.type)
 
     except Exception as e:
         error_message = f"Error: {e}\n {traceback.format_exc()}"
@@ -259,4 +264,4 @@ def get_forecast():
     sys.exit(0)
 
 if __name__ == '__main__':
-    get_forecast()
+    main()
