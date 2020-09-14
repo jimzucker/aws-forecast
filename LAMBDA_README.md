@@ -16,7 +16,7 @@ There are 3 parts to configuring this to run as a Lambda
   4. Copy the webhook URL from the setup instructions and use it in the next section.
 
 ### To encrypt your secrets use the following steps
-
+(*TODO: currently not supported you must use secrets manager)
   1. Create or use an existing KMS Key - http://docs.aws.amazon.com/kms/latest/developerguide/create-keys.html
 
   2. Expand "Encryption configuration" and click the "Enable helpers for encryption in transit" checkbox
