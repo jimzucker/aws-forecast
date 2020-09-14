@@ -21,7 +21,7 @@ So I set out to automate this as a slack post daily to save time.  While doing t
 ![Sample Output of get_forecast](https://github.com/jimzucker/aws-forecast/blob/master/images/get_forecast_sample_output.png)
 
 ### Enabling Slack
-To enable posting the message to slack instead of outputing to the command line you must define a secret in secrets manager called 'awsgenie_forecast_slack_url' with key=slack_url and value=<slack url>, if this secret is not found then the output is to the console.
+To enable posting the message to slack instead of outputing to the command line you must define a secret in secrets manager called 'awsgenie_secret_manager' with key=slack_url and value=<slack url>, if this secret is not found then the output is to the console.
 
 ![Enabling Slack](https://github.com/jimzucker/aws-forecast/blob/master/images/aws_secret.png)
 
