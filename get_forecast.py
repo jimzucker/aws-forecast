@@ -9,6 +9,7 @@ python3 get_forecast.py --profile <account>  --type [FORECAST |ACTUALS]
 References
   * Setup SNS: https://docs.aws.amazon.com/sns/latest/dg/sns-getting-started.html
   * Setup Slack as SNS subscriber: https://medium.com/cohealo-engineering/how-set-up-a-slack-channel-to-be-an-aws-sns-subscriber-63b4d57ad3ea
+  * Setup Lambda to Slack: 
 
 
 Licensed to the Apache Software Foundation (ASF) under one
@@ -83,30 +84,30 @@ def arg_parser():
 
 
 def get_secret(sm_client,secret_key_name):
-    if AWS_LAMBDA_FUNCTION_NAME == "":
-        try:
-            text_secret_data = ""
-            get_secret_value_response = sm_client.get_secret_value( SecretId=AWSGENIE_SECRET_MANAGER )
-        except ClientError as e:
-            if e.response['Error']['Code'] == 'ResourceNotFoundException':
-                logger.error("The requested secret " + secret_name + " was not found")
-            elif e.response['Error']['Code'] == 'InvalidRequestException':
-                logger.error("The request was invalid due to:", e)
-            elif e.response['Error']['Code'] == 'InvalidParameterException':
-                logger.error("The request had invalid params:", e)
+    # if AWS_LAMBDA_FUNCTION_NAME == "":
+    try:
+        text_secret_data = ""
+        get_secret_value_response = sm_client.get_secret_value( SecretId=AWSGENIE_SECRET_MANAGER )
+    except ClientError as e:
+        if e.response['Error']['Code'] == 'ResourceNotFoundException':
+            logger.error("The requested secret " + secret_name + " was not found")
+        elif e.response['Error']['Code'] == 'InvalidRequestException':
+            logger.error("The request was invalid due to:", e)
+        elif e.response['Error']['Code'] == 'InvalidParameterException':
+            logger.error("The request had invalid params:", e)
 
-        # Secrets Manager decrypts the secret value using the associated KMS CMK
-        # Depending on whether the secret was a string or binary, only one of these fields will be populated
-        if 'SecretString' in get_secret_value_response:
-            text_secret_data = json.loads(get_secret_value_response['SecretString']).get(secret_key_name)
-        else:
-            #binary_secret_data = get_secret_value_response['SecretBinary']
-            logger.error("Binary Secrets not supported")
-
-            # Your code goes here.
-        return text_secret_data
+    # Secrets Manager decrypts the secret value using the associated KMS CMK
+    # Depending on whether the secret was a string or binary, only one of these fields will be populated
+    if 'SecretString' in get_secret_value_response:
+        text_secret_data = json.loads(get_secret_value_response['SecretString']).get(secret_key_name)
     else:
-        return ""
+        #binary_secret_data = get_secret_value_response['SecretBinary']
+        logger.error("Binary Secrets not supported")
+
+        # Your code goes here.
+    return text_secret_data
+    # else:
+    #     return ""
 
 def send_slack(slack_url, message):
     #make it a NOP if URL is NULL
@@ -148,46 +149,50 @@ def send_sns(boto3_session, sns_arn, message):
 def display_output(boto3_session, message):
     slack_url=""
     sns_arn=""
-    if AWS_LAMBDA_FUNCTION_NAME != "" :
-        try:
-            # The base-64 encoded, encrypted key (CiphertextBlob) stored in the kmsEncryptedHookUrl environment variable
-            ENCRYPTED_PARAM = os.environ[SLACK_SECRET_KEY_NAME]
+    # if AWS_LAMBDA_FUNCTION_NAME != "" :
+    #     try:
+    #         # The base-64 encoded, encrypted key (CiphertextBlob) stored in the kmsEncryptedHookUrl environment variable
+    #         ENCRYPTED_PARAM = os.environ[SLACK_SECRET_KEY_NAME]
+    #         logger.info("ENCRYPTED_PARAM $s", ENCRYPTED_PARAM
+    #                     )
+    #         # The Slack channel to send a message to stored in the slackChannel environment variable
+    #         slack_url = "https://" + boto3.client('kms').decrypt(
+    #             CiphertextBlob=b64decode(ENCRYPTED_PARAM),
+    #             EncryptionContext={'LambdaFunctionName': AWS_LAMBDA_FUNCTION_NAME}
+    #         )['Plaintext'].decode('utf-8')
+    #
+    #
+    #     except Exception as e:
+    #         logger.warning("Disabling Slack URL not found")
+    #
+    #     try:
+    #         # The base-64 encoded, encrypted key (CiphertextBlob) stored in the kmsEncryptedHookUrl environment variable
+    #         ENCRYPTED_PARAM = os.environ[SNS_SECRET_KEY_NAME]
+    #         logger.info("ENCRYPTED_PARAM $s", ENCRYPTED_PARAM)
+    #
+    #         # The Slack channel to send a message to stored in the slackChannel environment variable
+    #         sns_arn = boto3.client('kms').decrypt(
+    #             CiphertextBlob=b64decode(ENCRYPTED_PARAM),
+    #             EncryptionContext={'LambdaFunctionName': AWS_LAMBDA_FUNCTION_NAME}
+    #         )['Plaintext'].decode('utf-8')
+    #     except Exception as e:
+    #         logger.warning("Disabling SNS Arn not found")
+    #
+    #     if slack_url == "" and sns_arn == "":
+    #         logger.error("SNS & Slack disabled Lambda will not work")
+    #         raise Exception("Error: SNS & Slack disabled Lambda will not work")
+    #
+    # else:
+    secrets_manager_client = boto3_session.client('secretsmanager')
+    try:
+        slack_url='https://' + get_secret(secrets_manager_client, SLACK_SECRET_KEY_NAME)
+    except Exception as e:
+        logger.warning("Disabling Slack URL not found")
 
-            # The Slack channel to send a message to stored in the slackChannel environment variable
-            slack_url = "https://" + boto3.client('kms').decrypt(
-                CiphertextBlob=b64decode(ENCRYPTED_PARAM),
-                EncryptionContext={'LambdaFunctionName': os.environ['AWS_LAMBDA_FUNCTION_NAME']}
-            )['Plaintext'].decode('utf-8')
-        except Exception as e:
-            logger.warning("Disabling Slack URL not found")
-
-        try:
-            # The base-64 encoded, encrypted key (CiphertextBlob) stored in the kmsEncryptedHookUrl environment variable
-            ENCRYPTED_PARAM = os.environ[SNS_SECRET_KEY_NAME]
-
-            # The Slack channel to send a message to stored in the slackChannel environment variable
-            sns_arn = boto3.client('kms').decrypt(
-                CiphertextBlob=b64decode(ENCRYPTED_PARAM),
-                EncryptionContext={'LambdaFunctionName': os.environ['AWS_LAMBDA_FUNCTION_NAME']}
-            )['Plaintext'].decode('utf-8')
-        except Exception as e:
-            logger.warning("Disabling SNS Arn not found")
-
-        if slack_url == "" & sns_arn == "":
-            logger.error("SNS & Slack disabled Lambda will not work")
-            raise Exception("Error: SNS & Slack disabled Lambda will not work")
-
-    else:
-        secrets_manager_client = boto3_session.client('secretsmanager')
-        try:
-            slack_url='https://' + get_secret(secrets_manager_client, SLACK_SECRET_KEY_NAME)
-        except Exception as e:
-            logger.warning("Disabling Slack URL not found")
-
-        try:
-            sns_arn=get_secret(secrets_manager_client, SNS_SECRET_KEY_NAME)
-        except Exception as e:
-            logger.warning("Disabling SNS Arn not found")
+    try:
+        sns_arn=get_secret(secrets_manager_client, SNS_SECRET_KEY_NAME)
+    except Exception as e:
+        logger.warning("Disabling SNS Arn not found")
 
     send_slack(slack_url, message)
     send_sns(boto3_session, sns_arn, message)
