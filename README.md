@@ -1,6 +1,6 @@
 # aws-forecast
 
-![Image of Cost Explorer](https://github.com/jimzucker/aws-forecast/blob/master/images/cost_explorer.png)
+![Image of Cost Explorer](https://github.com/jimzucker/aws-forecast/blob/main/images/cost_explorer.png)
 
 ### User Story
 I found myself logging in daily check our AWS spend and change to prior month to keep an eye on our AWS bill and decided to create a script to slack it one time per day to save time.
@@ -18,7 +18,7 @@ So I set out to automate this as a slack post daily to save time.  While doing t
 ```python3 get_forecast.py --profile <aws profile>  --type [FORECAST | ACTUALS]```
 
 ### Sample Output
-![Sample Output of get_forecast](https://github.com/jimzucker/aws-forecast/blob/master/images/get_forecast_sample_output.png)
+![Sample Output of get_forecast](https://github.com/jimzucker/aws-forecast/blob/main/images/get_forecast_sample_output.png)
 
 ### Enabling Slack
 To enable posting the message to Slack you must define a secret in secrets manager called 'awsgenie_secret_manager' with key=slack_url and value=<slack url>.
@@ -26,7 +26,7 @@ To enable posting the message to Slack you must define a secret in secrets manag
 ### Enabling SNS
 To enable posting the message to SNS you must define a secret in secrets manager called 'awsgenie_secret_manager' with key=sns_arn and value=<sns arn>.
 
-![Enabling Slack](https://github.com/jimzucker/aws-forecast/blob/master/images/aws_secret.png)
+![Enabling Slack](https://github.com/jimzucker/aws-forecast/blob/main/images/aws_secret.png)
 
 ### Setting up Lambda
 There are 3 parts to configuring this to run as a Lambda
@@ -34,10 +34,10 @@ There are 3 parts to configuring this to run as a Lambda
 2. Trigger - Event Bridge(Cloudwatch Alarms) setup with a cron expression to trigger a run daily.
 3. Function Code - You can directly paste in the get_forecast.py file is is all ready to go.
 
-[Click here for instructions for setting up Lambda](https://github.com/jimzucker/aws-forecast/blob/master/LAMBDA_README.md)
+[Click here for instructions for setting up Lambda](https://github.com/jimzucker/aws-forecast/blob/main/LAMBDA_README.md)
 
 # AWS Architecture
-![AWS Architecture](https://github.com/jimzucker/aws-forecast/blob/master/images/aws_architecture.png)
+![AWS Architecture](https://github.com/jimzucker/aws-forecast/blob/main/images/aws_architecture.png)
 
 
 # Technical Notes
