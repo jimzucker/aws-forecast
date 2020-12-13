@@ -4,13 +4,22 @@ Written by: Jim Zucker
 Date: Sept 4, 2020
 
 Commandline:
-python3 get_forecast.py --profile <account>  --type [FORECAST |ACTUALS]
+python3 get_forecast.py
+
+Environment Variables:
+    GET_FORECAST_COLUMNS_DISPLAYED - specify columnns and order 
+        default: "Account,MTD,Forecast,Change"
+
+    GET_FORECAST_ACCOUNT_COLUMN_WIDTH - max width for account name
+        default: 17
+
+    AWS_LAMBDA_FUNCTION_NAME - set if running in lambda, allows us to re-use the same .py on commandline for testing
+    GET_FORECAST_AWS_PROFILE - set for test on command line
 
 References
+  * Calling Cost Explorer: https://aws.amazon.com/blogs/aws-cost-management/update-cost-explorer-forecasting-api-improvement/
   * Setup SNS: https://docs.aws.amazon.com/sns/latest/dg/sns-getting-started.html
   * Setup Slack as SNS subscriber: https://medium.com/cohealo-engineering/how-set-up-a-slack-channel-to-be-an-aws-sns-subscriber-63b4d57ad3ea
-  * Setup Lambda to Slack: 
-
 
 Licensed to the Apache Software Foundation (ASF) under one
 or more contributor license agreements.  See the NOTICE file
@@ -30,19 +39,17 @@ specific language governing permissions and limitations
 under the License.
 """
 
-import argparse
 import sys
 import logging
 import boto3
 import os
-from datetime import datetime
+import datetime
 from dateutil.relativedelta import relativedelta
 from botocore.exceptions import ClientError
 import json
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
 from base64 import b64decode
-
 
 # Initialize you log configuration using the base class
 logging.basicConfig(level = logging.INFO)
@@ -58,29 +65,6 @@ try:
     AWS_LAMBDA_FUNCTION_NAME = os.environ['AWS_LAMBDA_FUNCTION_NAME']
 except Exception as e:
     logger.info("Not running as lambda")
-
-def arg_parser():
-    """Extracts various arguments from command line
-    Args:
-        None.
-
-    Returns:
-        obj: arguments parser.
-    """
-
-    def formatter(prog):
-        return argparse.HelpFormatter(prog, width=100, max_help_position=100)
-
-    parser = argparse.ArgumentParser(formatter_class=formatter)
-
-    # define params:
-    parser.add_argument('--profile', help=argparse.SUPPRESS, required=True, dest='profile')
-    parser.add_argument('--type', help=argparse.SUPPRESS, required=True, dest='type')
-#    parser.add_argument('--debug', help=argparse.SUPPRESS, required=False, action='store_true', dest='debug')
-
-    # set parser:
-    cmdline_params = parser.parse_args()
-    return cmdline_params
 
 
 def get_secret(sm_client,secret_key_name):
@@ -147,197 +131,250 @@ def send_sns(boto3_session, sns_arn, message):
 
 
 def display_output(boto3_session, message):
-    slack_url=""
-    sns_arn=""
-    # if AWS_LAMBDA_FUNCTION_NAME != "" :
-    #     try:
-    #         # The base-64 encoded, encrypted key (CiphertextBlob) stored in the kmsEncryptedHookUrl environment variable
-    #         ENCRYPTED_PARAM = os.environ[SLACK_SECRET_KEY_NAME]
-    #         logger.info("ENCRYPTED_PARAM $s", ENCRYPTED_PARAM
-    #                     )
-    #         # The Slack channel to send a message to stored in the slackChannel environment variable
-    #         slack_url = "https://" + boto3.client('kms').decrypt(
-    #             CiphertextBlob=b64decode(ENCRYPTED_PARAM),
-    #             EncryptionContext={'LambdaFunctionName': AWS_LAMBDA_FUNCTION_NAME}
-    #         )['Plaintext'].decode('utf-8')
-    #
-    #
-    #     except Exception as e:
-    #         logger.warning("Disabling Slack URL not found")
-    #
-    #     try:
-    #         # The base-64 encoded, encrypted key (CiphertextBlob) stored in the kmsEncryptedHookUrl environment variable
-    #         ENCRYPTED_PARAM = os.environ[SNS_SECRET_KEY_NAME]
-    #         logger.info("ENCRYPTED_PARAM $s", ENCRYPTED_PARAM)
-    #
-    #         # The Slack channel to send a message to stored in the slackChannel environment variable
-    #         sns_arn = boto3.client('kms').decrypt(
-    #             CiphertextBlob=b64decode(ENCRYPTED_PARAM),
-    #             EncryptionContext={'LambdaFunctionName': AWS_LAMBDA_FUNCTION_NAME}
-    #         )['Plaintext'].decode('utf-8')
-    #     except Exception as e:
-    #         logger.warning("Disabling SNS Arn not found")
-    #
-    #     if slack_url == "" and sns_arn == "":
-    #         logger.error("SNS & Slack disabled Lambda will not work")
-    #         raise Exception("Error: SNS & Slack disabled Lambda will not work")
-    #
-    # else:
     secrets_manager_client = boto3_session.client('secretsmanager')
     try:
         slack_url='https://' + get_secret(secrets_manager_client, SLACK_SECRET_KEY_NAME)
+        send_slack(slack_url, message)
     except Exception as e:
-        logger.warning("Disabling Slack URL not found")
+        logger.info("Disabling Slack, URL not found")
 
     try:
         sns_arn=get_secret(secrets_manager_client, SNS_SECRET_KEY_NAME)
+        send_sns(boto3_session, sns_arn, message)
     except Exception as e:
-        logger.warning("Disabling SNS Arn not found")
+        logger.info("Disabling SNS, Arn not found")
 
-    send_slack(slack_url, message)
-    send_sns(boto3_session, sns_arn, message)
     print(message)
 
 
-#
-# Calculates forecast, ignoring credits
-#
-def get_cost_forecast(costs_explorer_client, start_time, end_time):
-    response = costs_explorer_client.get_cost_forecast(
-        TimePeriod=dict(Start=start_time, End=end_time),
-        Metric='BLENDED_COST',
-        Granularity='MONTHLY',
-        Filter={
-            "Not": {
-                "Dimensions": {
-                    "Key": "RECORD_TYPE",
-                    "Values": [
-                        "Credit", "Refund"
-                    ]
-                }
+def calc_forecast(boto3_session):
+    #create the clients we need for ce & org
+    ce = boto3_session.client('ce')
+    org = boto3_session.client('organizations')
+    sts = boto3_session.client('sts')
+
+    #initialize the standard filter
+    not_filter= {
+        "Not": {
+            "Dimensions": {
+                "Key": "RECORD_TYPE",
+                "Values": [ "Credit", "Refund" ]
             }
         }
-    )
+    }
 
-    return float(response['Total']['Amount'])
+    #get accountname for organization
+    org_account_id = sts.get_caller_identity().get('Account')
+    org_name=org.describe_account(AccountId=org_account_id)['Account']['Name']
 
-#
-# used to calculate prior months and current months spend, excluding credits
-#
-def get_cost_and_usage(costs_explorer_client, first_day_of_prior_month, last_day_of_previous_month):
-    response = costs_explorer_client.get_cost_and_usage(
-        TimePeriod={
-            'Start': first_day_of_prior_month,
-            'End': last_day_of_previous_month
-        },
-        Granularity='MONTHLY',
-        Filter={
-            "Not": {
-                "Dimensions": {
-                    "Key": "RECORD_TYPE",
-                    "Values": [
-                        "Credit", "Refund"
-                    ]
-                }
+
+    utcnow = datetime.datetime.utcnow()
+    today = utcnow.strftime('%Y-%m-%d') 
+    first_day_of_month = utcnow.strftime('%Y-%m') + "-01"
+    first_day_next_month = (utcnow + relativedelta(months=1)).strftime("%Y-%m-01")
+    first_day_prior_month = (utcnow + relativedelta(months=-1)).strftime("%Y-%m-01")
+
+    logger.debug("today=",today)
+    logger.debug("first_day_of_month=",first_day_of_month)
+    logger.debug("first_day_next_month=",first_day_next_month)
+    logger.debug("first_day_prior_month=",first_day_prior_month)
+
+
+    #Get total cost_and_usage
+    results = []
+    data = ce.get_cost_and_usage(
+        TimePeriod={'Start': first_day_of_month, 'End':  first_day_next_month}
+        , Granularity='MONTHLY', Metrics=['UnblendedCost'], Filter=not_filter
+        )
+    results = data['ResultsByTime']
+    amount_usage = float(results[0]['Total']['UnblendedCost']['Amount'])
+
+    try:
+        data = ce.get_cost_and_usage(
+            TimePeriod={'Start': first_day_prior_month, 'End':  first_day_of_month}
+            , Granularity='MONTHLY', Metrics=['UnblendedCost'], Filter=not_filter
+            )
+        results = data['ResultsByTime']
+        amount_usage_prior_month = float(results[0]['Total']['UnblendedCost']['Amount'])
+    except Exception as e:
+        amount_usage_prior_month = 0
+
+    #Total Forecast
+    try:
+        data = ce.get_cost_forecast(
+            TimePeriod={'Start': today, 'End':  first_day_next_month}
+            , Granularity='MONTHLY', Metric='UNBLENDED_COST', Filter=not_filter
+            )
+        amount_forecast = float(data['Total']['Amount'])
+    except Exception as e:
+        amount_forecast = amount_usage
+
+    forecast_variance = 100
+    if amount_usage_prior_month > 0 :
+        forecast_variance = (amount_forecast-amount_usage_prior_month) / amount_usage_prior_month *100
+
+    result = {
+        "account_name": 'Total',
+        "amount_usage": amount_usage,
+        "amount_forecast": amount_forecast,
+        "forecast_variance": (amount_forecast-amount_usage_prior_month) / amount_usage_prior_month *100
+    }
+    output=[]
+    output.append(result)
+
+    #Get usage caose for all accounts
+    results = []
+    next_page_token = None
+    while True:
+        if next_page_token:
+            kwargs = {'NextPageToken': next_page_token}
+        else:
+            kwargs = {}
+        data = ce.get_cost_and_usage(
+            TimePeriod={'Start': first_day_of_month, 'End':  first_day_next_month}
+            , Granularity='MONTHLY', Metrics=['UnblendedCost'], Filter=not_filter
+            , GroupBy=[{'Type': 'DIMENSION', 'Key': 'LINKED_ACCOUNT'}]
+            , **kwargs)
+        results += data['ResultsByTime']
+        next_page_token = data.get('NextPageToken')
+        if not next_page_token:
+            break
+
+    # Print each account
+    for result_by_time in results:
+        for group in result_by_time['Groups']:
+            amount_usage = float(group['Metrics']['UnblendedCost']['Amount'])
+            linked_account = group['Keys'][0]
+            
+            #create filter
+            linked_account_filter = {
+                "And": [
+                    {
+                      "Dimensions": {
+                        "Key": "LINKED_ACCOUNT",
+                        "Values": [
+                          linked_account
+                        ]
+                      }
+                    },
+                    not_filter
+                ]
             }
-        },
-        Metrics=[
-            'BlendedCost',
-        ]
-    )
+            
+            #get prior-month usage, it may not exist
+            try:
+                data = ce.get_cost_and_usage(
+                    TimePeriod={'Start': first_day_prior_month, 'End':  first_day_of_month}
+                    , Granularity='MONTHLY', Metrics=['UnblendedCost'], Filter=linked_account_filter
+                    )
+                results = data['ResultsByTime']
+                amount_usage_prior_month = float(results[0]['Total']['UnblendedCost']['Amount']) 
+            except Exception as e:
+                amount_usage_prior_month = 0
 
-    return float(response['ResultsByTime'][0]['Total']['BlendedCost']['Amount'])
+            #Forecast, there maybe insuffcient data on a new account
+            try:
+                data = ce.get_cost_forecast(
+                    TimePeriod={'Start': today, 'End':  first_day_next_month}
+                    , Granularity='MONTHLY', Metric='UNBLENDED_COST', Filter=linked_account_filter
+                    )
+                amount_forecast = float(data['Total']['Amount'])
+            except Exception as e:
+                amount_forecast = amount_usage
+
+            variance = 100
+            if amount_usage_prior_month > 0 :
+                variance = (amount_forecast-amount_usage_prior_month) / amount_usage_prior_month *100
+
+            account_name=org.describe_account(AccountId=linked_account)['Account']['Name']
+            result = {
+                "account_name": account_name,
+                "amount_usage": amount_usage,
+                "amount_forecast": amount_forecast,
+                "forecast_variance": variance
+            }
+            output.append(result)
+    return output
 
 
-#
-# Calculates forecast and % change from prior month
-# note: We found we had to adjust dates for it to work saturday and sunday.  We also found that
-#   on some days the forecast calls fail and we have to fall back to actuals 
-#
-def calc_forecast(boto3_session):
-    costs_explorer_client = boto3_session.client('ce')
-    now = datetime.utcnow()  # current date and time
+def format_rows(output,account_width):
+    #print the heading
+    mtd_width=8
+    forecast_width=8
+    change_width=6
 
-    # To get get_cost_forecast to work correctly 7 days a week we have to tweak the start end dates a bit.
-    # Also some days even this failes towards the end of the month and we have to switch to showing actuals
+    output_rows=[]
 
-    # check if it is a weekend mon=1..sun=7 and move to monyda
-    week_day = now.isoweekday()
-    cost_type = "Forecast"
-    if week_day >= 5:
-        days_check = 7 - now.isoweekday() + 1
-        start_time = (now + relativedelta(days=days_check)).strftime("%Y-%m-%d")
-    else:
-        start_time = (now + relativedelta(days=1)).strftime("%Y-%m-%d")
+    row = {
+        "Account": 'Account'.ljust(account_width),
+        "MTD": 'MTD'.rjust(mtd_width),
+        "Forecast": 'Forecast'.rjust(forecast_width),
+        "Change": 'Change'.rjust(change_width)
+    }
+    output_rows.append(row)
 
-        # this is always the first of the next month
-    end_time = (now + relativedelta(months=1)).strftime("%Y-%m-01")
+    #print in decending order by forecast
+    lines = sorted(output, key=lambda k: k.get('amount_forecast'), reverse=True)
+    for line in lines :
+        if len(lines) == 2 and line.get('account_name') == 'Total':
+            break
+        change = "{0:,.1f}%".format(line.get('forecast_variance'))
+        row = {
+            "Account": line.get('account_name')[:account_width].ljust(account_width),
+            "MTD": "${0:,.0f}".format(line.get('amount_usage')).rjust(mtd_width),
+            "Forecast": "${0:,.0f}".format(line.get('amount_forecast')).rjust(forecast_width),
+            "Change": change.rjust(change_width)
+        }
+        output_rows.append(row)
 
-    try:
-        current_month_forecast = get_cost_forecast(costs_explorer_client, start_time, end_time)
-    except Exception as e:
-        logger.warning("WARNING: Cannot forecast, falling back to Actuals, start_time=", start_time, " ,end_time=", end_time, "\n")
+    return output_rows
 
-        # when an account is new forecast wil not work and you have to use actuals
-        start_time = (now.replace(day=1)).strftime("%Y-%m-%d")
-        end_time = now.strftime("%Y-%m-%d")
-        try:
-            cost_type = "Actuals(MTD - not enought data to forecast)"
-            current_month_forecast = get_cost_and_usage(costs_explorer_client, start_time, end_time)
-        except Exception as e:
-            cost_type = "Error cannot calculate forecast"
-            current_month_forecast = 0
-            error_message = f"Exception calculating Current Month, start_time={start_time} end_time={end_time}\n {e}"
-            logger.error(error_message);
+def publish_forecast(boto3_session) :
 
-    # get last months bill
-    first_day_of_prior_month = (now + relativedelta(months=-1)).replace(day=1).strftime("%Y-%m-%d")
-    last_day_of_previous_month = (now.replace(day=1) + relativedelta(days=-1)).strftime("%Y-%m-%d")
+    #read params
+    columns_displayed = ["Account", "MTD", "Forecast", "Change"]
+    if 'GET_FORECAST_COLUMNS_DISPLAYED' in os.environ:
+        columns_displayed=os.environ['GET_FORECAST_COLUMNS_DISPLAYED']
+        columns_displayed = columns_displayed.split(',')
 
-    try:
-        prior_month_bill = get_cost_and_usage(costs_explorer_client, first_day_of_prior_month, last_day_of_previous_month)
-    except Exception as e:
-        prior_month_bill = 0
-        error_message = f"Error: Exception calculating Prior Month, first_day_of_prior_month=" \
-                        f"{first_day_of_prior_month} last_day_of_previous_month={last_day_of_previous_month}\n {e}"
-        logger.error(error_message);
+    account_width=17
+    if 'GET_FORECAST_ACCOUNT_COLUMN_WIDTH' in os.environ:
+        account_width=os.environ['GET_FORECAST_ACCOUNT_COLUMN_WIDTH']
 
-    pct_change = 0
-    if current_month_forecast != 0:
-        pct_change = (1 - prior_month_bill / current_month_forecast) * 100
+    output = calc_forecast(boto3_session)
+    formated_rows = format_rows(output, account_width)
 
-    return cost_type + ": ${0:,.0f}".format(float(current_month_forecast)) + " ({0:+.2f}%)".format(pct_change)
-
-def get_forecast(boto3_session, type):
-    if type in ['FORECAST']:
-        forecast = calc_forecast(boto3_session)
-        display_output(boto3_session, forecast)
-    elif type in ['ACTUALS']:
-        raise Exception("not implimented - ACTUALS")
-    else:
-        raise Exception("Invalid run type: cmdline_params.type . Please choose from: FORECAST, ACTUALS")
-
-    return forecast
+    message=""
+    for line in formated_rows :
+        formated_line=""
+        for column in columns_displayed :
+            if formated_line != "" :
+                formated_line += " "
+            formated_line += line.get(column)
+        message += formated_line.rstrip() + "\n"
+    display_output(boto3_session, message)
 
 def lambda_handler(event, context):
     try:
-        get_forecast(boto3, "FORECAST")
+        publish_forecast(boto3)
     except Exception as e:
         print(e)
         raise Exception("Cannot connect to Cost Explorer with boto3")
 
 def main():
     try:
-        cmdline_params = arg_parser()
-        boto3_session = boto3.Session(profile_name=cmdline_params.profile)
+        boto3_session = boto3.session.Session()
+        if 'GET_FORECAST_AWS_PROFILE' in os.environ:
+            profile_name=os.environ['GET_FORECAST_AWS_PROFILE']
+            logger.info("Setting AWS Proflie ="+profile_name)
+            boto3_session = boto3.session.Session(profile_name=profile_name)
 
         try:
-            get_forecast(boto3_session, cmdline_params.type)
+            publish_forecast(boto3_session)
         except Exception as e:
-            raise Exception("Cannot connect to Cost Explorer with boto3")
+            raise e
 
     except Exception as e:
-        logger.error("Cannot connect to boto3");
         logger.error(e);
         sys.exit(1)
 
