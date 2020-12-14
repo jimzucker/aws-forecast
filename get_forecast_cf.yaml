@@ -1,0 +1,133 @@
+
+
+Parameters:
+  slackUrlParameter:
+    NoEcho: true
+    Type: String
+    Default: ""
+    Description: Enter slack url if you want slack sent.
+
+  cronParameter:
+    Type: String
+    Default: "cron(0 14 * * ? *)"
+    Description: Schedule expression.
+
+  snsArnParameter:
+    Type: String
+    Default: ""
+    Description: Enter sns ARN if you want slack sent.
+
+  columnsToDisplayParameter:
+    Type: String
+    Default: "Account,MTD,Forecast,Change"
+    Description: Specify column order and columns to display.
+
+  getForecastAccountNameColumnWidth:
+    Type: Number
+    Default: 17
+    Description: Specify max width for account names.
+
+Conditions:
+  useSnsCondition: !Not [ !Equals [ !Ref snsArnParameter , "" ] ]
+
+Resources:
+  #create a role for lambda
+  getForecastFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: 
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: "/"
+      Policies:
+      - PolicyName: root
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:*
+            Resource: arn:aws:logs:*:*:*
+      ManagedPolicyArns:
+      - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+
+  getForecastLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: getForecastLambda
+      Role: !GetAtt getForecastFunctionRole.Arn
+      Timeout: 30
+      Handler: index.handler
+      Runtime: python3.6
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import traceback
+          def handler(event, context):
+            try:
+              print(json.dumps(event))
+              return
+            except Exception as e:
+              traceback.print_exc()
+      Description: Post current forecast to slack.  
+
+  getForecastLambdaPermission:
+    Condition: useSnsCondition
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      FunctionName: !Ref getForecastLambda
+      Principal: sns.amazonaws.com
+      SourceArn: !Ref snsArnParameter
+
+  # if you dont define this it will get created but will have a indefinite retention
+  # so we define it to ensure lgos roll
+  getForecastLambdaLogGroup:
+    Type: 'AWS::Logs::LogGroup'
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${getForecastLambda}"
+      RetentionInDays: '7'
+
+
+  getForecastScheduledRule: 
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: "Crontab schedule for daily forecast"
+      ScheduleExpression: !Ref cronParameter
+#      ScheduleExpression: "cron(0 14 * * ? *)"
+      State: "ENABLED"
+      Targets: 
+        - 
+          Arn: 
+            Fn::GetAtt: 
+              - "getForecastLambda"
+              - "Arn"
+          Id: "TargetFunctionV1"
+
+  getForecastScheduledRulePermission: 
+    Type: AWS::Lambda::Permission
+    Properties: 
+      FunctionName: !Ref "getForecastLambda"
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceArn: 
+        Fn::GetAtt: 
+          - "getForecastScheduledRule"
+          - "Arn"
+
+  awsGenieSecretManager:
+    Type: 'AWS::SecretsManager::Secret'
+    Properties:
+      Name: awsgenie_secret_manager
+      SecretString: !Join [ '', [ '{"slack_url":', !Ref slackUrlParameter, '"sns_arn":', !Ref snsArnParameter, '}' ]]
+
+
+
+################################################################################################
