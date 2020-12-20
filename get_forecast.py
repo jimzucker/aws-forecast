@@ -163,11 +163,6 @@ def calc_forecast(boto3_session):
         }
     }
 
-    #get accountname for organization
-    org_account_id = sts.get_caller_identity().get('Account')
-    org_name=org.describe_account(AccountId=org_account_id)['Account']['Name']
-
-
     utcnow = datetime.datetime.utcnow()
     today = utcnow.strftime('%Y-%m-%d') 
     first_day_of_month = utcnow.strftime('%Y-%m') + "-01"
@@ -217,7 +212,7 @@ def calc_forecast(boto3_session):
         "account_name": 'Total',
         "amount_usage": amount_usage,
         "amount_forecast": amount_forecast,
-        "forecast_variance": (amount_forecast-amount_usage_prior_month) / amount_usage_prior_month *100
+        "forecast_variance": forecast_variance
     }
     output=[]
     output.append(result)
@@ -286,7 +281,11 @@ def calc_forecast(boto3_session):
             if amount_usage_prior_month > 0 :
                 variance = (amount_forecast-amount_usage_prior_month) / amount_usage_prior_month *100
 
-            account_name=org.describe_account(AccountId=linked_account)['Account']['Name']
+            try: 
+                account_name=org.describe_account(AccountId=linked_account)['Account']['Name']
+            except AWSOrganizationsNotInUseException as e:
+                account_name=linked_account
+
             result = {
                 "account_name": account_name,
                 "amount_usage": amount_usage,
@@ -294,6 +293,7 @@ def calc_forecast(boto3_session):
                 "forecast_variance": variance
             }
             output.append(result)
+
     return output
 
 
@@ -317,7 +317,7 @@ def format_rows(output,account_width):
     lines = sorted(output, key=lambda k: k.get('amount_forecast'), reverse=True)
     for line in lines :
         if len(lines) == 2 and line.get('account_name') == 'Total':
-            break
+            continue
         change = "{0:,.1f}%".format(line.get('forecast_variance'))
         row = {
             "Account": line.get('account_name')[:account_width].ljust(account_width),
@@ -326,11 +326,10 @@ def format_rows(output,account_width):
             "Change": change.rjust(change_width)
         }
         output_rows.append(row)
-
+        
     return output_rows
 
 def publish_forecast(boto3_session) :
-
     #read params
     columns_displayed = ["Account", "MTD", "Forecast", "Change"]
     if 'GET_FORECAST_COLUMNS_DISPLAYED' in os.environ:
