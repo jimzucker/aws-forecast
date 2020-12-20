@@ -293,6 +293,7 @@ def calc_forecast(boto3_session):
                 "forecast_variance": variance
             }
             output.append(result)
+
     return output
 
 
@@ -316,7 +317,7 @@ def format_rows(output,account_width):
     lines = sorted(output, key=lambda k: k.get('amount_forecast'), reverse=True)
     for line in lines :
         if len(lines) == 2 and line.get('account_name') == 'Total':
-            break
+            continue
         change = "{0:,.1f}%".format(line.get('forecast_variance'))
         row = {
             "Account": line.get('account_name')[:account_width].ljust(account_width),
@@ -325,7 +326,7 @@ def format_rows(output,account_width):
             "Change": change.rjust(change_width)
         }
         output_rows.append(row)
-
+        
     return output_rows
 
 def publish_forecast(boto3_session) :
