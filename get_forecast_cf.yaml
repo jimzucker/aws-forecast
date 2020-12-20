@@ -54,6 +54,14 @@ Resources:
             Action:
             - logs:*
             Resource: arn:aws:logs:*:*:*
+          - Effect: Allow
+            Action:
+            - organizations:DescribeAccount
+            Resource: "*"
+          - Effect: Allow
+            Action:
+            - ce:GetCostAndUsage
+            Resource: "*"
       ManagedPolicyArns:
       - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
 
@@ -63,19 +71,11 @@ Resources:
       FunctionName: getForecastLambda
       Role: !GetAtt getForecastFunctionRole.Arn
       Timeout: 30
-      Handler: index.handler
+      Handler: get_forecast.lambda_handler
       Runtime: python3.6
       Code:
-        ZipFile: |
-          import json
-          import boto3
-          import traceback
-          def handler(event, context):
-            try:
-              print(json.dumps(event))
-              return
-            except Exception as e:
-              traceback.print_exc()
+        S3Bucket: jimzucker-github-getforecast
+        S3Key: get_forecast.zip
       Description: Post current forecast to slack.  
 
   getForecastLambdaPermission:
@@ -91,6 +91,7 @@ Resources:
   # so we define it to ensure lgos roll
   getForecastLambdaLogGroup:
     Type: 'AWS::Logs::LogGroup'
+    DependsOn: getForecastLambda
     Properties:
       LogGroupName: !Sub "/aws/lambda/${getForecastLambda}"
       RetentionInDays: '7'
