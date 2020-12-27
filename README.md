@@ -1,6 +1,5 @@
 # aws-forecast
 
-## AWS Architecture
 ![AWS Architecture](https://github.com/jimzucker/aws-forecast/blob/main/images/aws_architecture.png)
 
 ### Environment Variables
