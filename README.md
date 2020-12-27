@@ -1,4 +1,5 @@
 # aws-forecast
+
 ![AWS Architecture](https://github.com/jimzucker/aws-forecast/blob/main/images/aws_architecture.png)
 
 ### Environment Variables
@@ -17,7 +18,8 @@ We use these to make it compatible with running the same script from Lambda and 
 If you enter and slack URL and/or SNS it will publish in addition to logging.
 
 #### File: get_forecast_cf.yaml
-![Image of Cost Explorer](https://github.com/jimzucker/aws-forecast/blob/main/images/cost_explorer.png)
+![Cloud Formation Inputs ](https://github.com/jimzucker/aws-forecast/blob/main/images/cloudformation_inputs.png)
+
 	Note: The Cloud Formation loads the python script from a public S3 bucket, s3://jimzucker-github-getforecast/get_forecast.zip
 	
 ### Sample Output
@@ -40,32 +42,8 @@ So I set out to automate this as a slack post daily to save time.  While doing t
 4. Post to slack if url is defined as an AWS secret (see below)
 5. Provide example Lambda function that posts to slack on a cron 1 time per day
 
-## Solution
-### AWS Architecture
-![AWS Architecture](https://github.com/jimzucker/aws-forecast/blob/main/images/aws_architecture.png)
-
-### Environment Variables
-We use these to make it compatible with running the same script from Lambda and the commandline for testing
-
-	GET_FORECAST_COLUMNS_DISPLAYED - specify columnns to display and the order 
-	    default: "Account,MTD,Forecast,Change"
-
-	GET_FORECAST_ACCOUNT_COLUMN_WIDTH - max width for account name for formatting
-		default: 17
-
-	AWS_LAMBDA_FUNCTION_NAME - set if running in lambda(Automatically set in Lambda)
-	GET_FORECAST_AWS_PROFILE - set for testing on command line to pick a profile from your credentials file
-
-### Command line
-If you enter and slack URL and/or SNS it will publish in addition to logging.
-#### File: get_forecast_cf.yaml
-![Cloud Formation Inputs ](https://github.com/jimzucker/aws-forecast/blob/main/images/cloudformation_inputs.png)
-	Note: The Cloud Formation loads the python script from a public S3 bucket, s3://jimzucker-github-getforecast/get_forecast.zip
-	
-
-### Command line (for development/testing)
-```python3 get_forecast.py```
 ### Technical Notes
+
 #### AWS API Used
 1. get_cost_forecast - used to get current month forecast. (note we exclude credits)
 2. get_cost_and_usage - used to get prior & current month actuals (note we exclude credits)
@@ -73,8 +51,8 @@ If you enter and slack URL and/or SNS it will publish in addition to logging.
 #### Boundary conditions handled
 In testing I found several situations where the calls to get_cost_forecast would fail that we address in function calc_forecast:
 1. Weekends - there is a sensitivity to the start date being on a weekend
-2. Failure on new accounts or start of the month - on some days the calc fails due to insufficient data and we have to fall back to actuals\
+2. Failure on new accounts or start of the month - on some days the calc fails due to insufficient data and we have to fall back to actuals
 
-# Backlog
-1. Deploy the whole thing as infrastructure as code with Cloud Formation
+
+##	## Manual instructions
 If you dont want to use the Cloud Formation document, see these instructions: [Click here](https://github.com/jimzucker/aws-forecast/blob/main/MANUAL_SETUP_README.md)
