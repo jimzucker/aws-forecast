@@ -72,7 +72,7 @@ Resources:
       Role: !GetAtt getForecastFunctionRole.Arn
       Timeout: 30
       Handler: get_forecast.lambda_handler
-      Runtime: python3.6
+      Runtime: python3.9
       Code:
         S3Bucket: jimzucker-github-getforecast
         S3Key: get_forecast.zip
