@@ -7,6 +7,12 @@ Parameters:
     Default: ""
     Description: Enter slack url if you want slack sent.
 
+  teamsUrlParameter:
+    NoEcho: true
+    Type: String
+    Default: ""
+    Description: Enter Teams url if you want a Teams message sent.
+
   cronParameter:
     Type: String
     Default: "cron(0 14 * * ? *)"
@@ -29,6 +35,7 @@ Parameters:
 
 Conditions:
   useSnsCondition: !Not [ !Equals [ !Ref snsArnParameter , "" ] ]
+  useTeamsCondition: !Not [ !Equals [ !Ref teamsUrlParameter , "" ] ]
 
 Resources:
   #create a role for lambda
@@ -127,7 +134,7 @@ Resources:
     Type: 'AWS::SecretsManager::Secret'
     Properties:
       Name: awsgenie_secret_manager
-      SecretString: !Join [ '', [ '{"slack_url":', !Ref slackUrlParameter, '"sns_arn":', !Ref snsArnParameter, '}' ]]
+      SecretString: !Join [ '', [ '{"slack_url":', !Ref slackUrlParameter, ', "sns_arn":', !Ref snsArnParameter, ', "teams_url":', !Ref teamsUrlParameter, '}' ]]
 
 
 

@@ -59,6 +59,7 @@ logger = logging.getLogger()
 AWSGENIE_SECRET_MANAGER="awsgenie_secret_manager"
 SLACK_SECRET_KEY_NAME="slack_url"
 SNS_SECRET_KEY_NAME="sns_arn"
+TEAMS_SECRET_KEY_NAME = "teams_url"
 
 AWS_LAMBDA_FUNCTION_NAME = ""
 try:
@@ -113,6 +114,27 @@ def send_slack(slack_url, message):
     except URLError as e:
         logger.error("Server connection failed: %s", e.reason)
         logger.error("slack_url= %s", slack_url)
+        
+def send_teams(teams_url, message):
+    #make it a NOP if URL is NULL
+    if teams_url == "":
+        return
+
+    teams_message = {
+        'text': message
+    }
+
+    req = Request(teams_url, json.dumps(teams_message).encode('utf-8'))
+    try:
+        response = urlopen(req)
+        response.read()
+        logger.debug("Message posted to teams")
+    except HTTPError as e:
+        logger.error("Request failed: %d %s", e.code, e.reason)
+        logger.error("TEAMS_URL= %s", teams_url)
+    except URLError as e:
+        logger.error("Server connection failed: %s", e.reason)
+        logger.error("teams_url= %s", teams_url)
 
 def send_sns(boto3_session, sns_arn, message):
     #make it a NOP if URL is NULL
@@ -137,6 +159,12 @@ def display_output(boto3_session, message):
         send_slack(slack_url, message)
     except Exception as e:
         logger.info("Disabling Slack, URL not found")
+        
+    try:
+        teams_url='https://' + get_secret(secrets_manager_client, TEAMS_SECRET_KEY_NAME)
+        send_teams(teams_url, message)
+    except Exception as e:
+        logger.info("Disabling Teams, URL not found")
 
     try:
         sns_arn=get_secret(secrets_manager_client, SNS_SECRET_KEY_NAME)
