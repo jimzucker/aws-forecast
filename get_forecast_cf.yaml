@@ -35,7 +35,6 @@ Parameters:
 
 Conditions:
   useSnsCondition: !Not [ !Equals [ !Ref snsArnParameter , "" ] ]
-  useTeamsCondition: !Not [ !Equals [ !Ref teamsUrlParameter , "" ] ]
 
 Resources:
   #create a role for lambda
