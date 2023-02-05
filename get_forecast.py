@@ -119,12 +119,20 @@ def send_teams(teams_url, message):
     #make it a NOP if URL is NULL
     if teams_url == "":
         return
-
-    teams_message = {
-        'text': message
+    
+    headers = {
+        'Content-Type': 'application/json'
+    }
+    data = {
+        "@type": "MessageCard",
+        "@context": "http://schema.org/extensions",
+        "summary": "AWS Lambda Message",
+        "themeColor": "0078D7",
+        "title": "AWS Cost Forecast",
+        "text": message
     }
 
-    req = Request(teams_url, json.dumps(teams_message).encode('utf-8'))
+    req = Request(teams_url, headers=headers,json=data)
     try:
         response = urlopen(req)
         response.read()
