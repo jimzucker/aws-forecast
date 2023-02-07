@@ -2,25 +2,19 @@
 Script to reproduce forecast $ (%) we see in the AWS Cost Explorer
 Written by: Jim Zucker
 Date: Sept 4, 2020
-
 Commandline:
 python3 get_forecast.py
-
 Environment Variables:
     GET_FORECAST_COLUMNS_DISPLAYED - specify columnns and order 
         default: "Account,MTD,Forecast,Change"
-
     GET_FORECAST_ACCOUNT_COLUMN_WIDTH - max width for account name
         default: 17
-
     AWS_LAMBDA_FUNCTION_NAME - set if running in lambda, allows us to re-use the same .py on commandline for testing
     GET_FORECAST_AWS_PROFILE - set for test on command line
-
 References
   * Calling Cost Explorer: https://aws.amazon.com/blogs/aws-cost-management/update-cost-explorer-forecasting-api-improvement/
   * Setup SNS: https://docs.aws.amazon.com/sns/latest/dg/sns-getting-started.html
   * Setup Slack as SNS subscriber: https://medium.com/cohealo-engineering/how-set-up-a-slack-channel-to-be-an-aws-sns-subscriber-63b4d57ad3ea
-
 Licensed to the Apache Software Foundation (ASF) under one
 or more contributor license agreements.  See the NOTICE file
 distributed with this work for additional information
@@ -28,9 +22,7 @@ regarding copyright ownership.  The ASF licenses this file
 to you under the Apache License, Version 2.0 (the
 "License"); you may not use this file except in compliance
 with the License.  You may obtain a copy of the License at
-
   http://www.apache.org/licenses/LICENSE-2.0
-
 Unless required by applicable law or agreed to in writing,
 software distributed under the License is distributed on an
 "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -58,8 +50,8 @@ logger = logging.getLogger()
     
 AWSGENIE_SECRET_MANAGER="awsgenie_secret_manager"
 SLACK_SECRET_KEY_NAME="slack_url"
+TEAMS_SECRET_KEY_NAME="teams_url"
 SNS_SECRET_KEY_NAME="sns_arn"
-TEAMS_SECRET_KEY_NAME = "teams_url"
 
 AWS_LAMBDA_FUNCTION_NAME = ""
 try:
@@ -119,9 +111,11 @@ def send_teams(teams_url, message):
     #make it a NOP if URL is NULL
     if teams_url == "":
         return
+
     teams_message = {
         'text': message
     }
+
     req = Request(teams_url, json.dumps(teams_message).encode('utf-8'))
     try:
         response = urlopen(req)
@@ -157,7 +151,7 @@ def display_output(boto3_session, message):
         send_slack(slack_url, message)
     except Exception as e:
         logger.info("Disabling Slack, URL not found")
-        
+    
     try:
         teams_url='https://' + get_secret(secrets_manager_client, TEAMS_SECRET_KEY_NAME)
         send_teams(teams_url, message)
