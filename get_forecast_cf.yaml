@@ -133,7 +133,7 @@ Resources:
     Type: 'AWS::SecretsManager::Secret'
     Properties:
       Name: awsgenie_secret_manager
-      SecretString: !Join [ '', [ '{"slack_url":', !Ref slackUrlParameter, ', "sns_arn":', !Ref snsArnParameter, ', "teams_url":', !Ref teamsUrlParameter, '}' ]]
+      SecretString: !Join [ '', [ '{"slack_url": "', !Ref slackUrlParameter, '", "sns_arn": "', !Ref snsArnParameter, '", "teams_url": "', !Ref teamUrlParameter, '"}' ]]
 
 
 
