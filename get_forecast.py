@@ -70,9 +70,7 @@ def get_secret(sm_client):
     try:
         secret = sm_client.get_secret_value( SecretId=AWSGENIE_SECRET_MANAGER )["SecretString"]
     except Exception as e:
-        if e.response['Error']['Code'] == 'ResourceNotFoundException':
-            logger.error("The requested secret " + secret_key_name + " was not found")
-        elif e.response['Error']['Code'] == 'InvalidRequestException':
+        if e.response['Error']['Code'] == 'InvalidRequestException':
             logger.error("The request was invalid due to:", e)
         elif e.response['Error']['Code'] == 'InvalidParameterException':
             logger.error("The request had invalid params:", e)
@@ -145,16 +143,13 @@ def send_sns(boto3_session, sns_arn, message):
 def display_output(boto3_session, message):
     secrets_manager_client = None
     secret = ""
-    if 'SECRETS_MANAGER_ENDPOINT' in os.environ:
-        logger.info("Using secrets_manager_endpoint.")
-        secrets_manager_client = boto3_session.client('secretsmanager', os.environ['SECRETS_MANAGER_ENDPOINT'])
-    else:
-        secrets_manager_client = boto3_session.client('secretsmanager')
+    secrets_manager_client = boto3_session.client('secretsmanager')
 
     try:
         secret = get_secret(secrets_manager_client)
     except Exception as e:
-        logger.error("get_secret failed")
+        logger.debug("get_secret failed")
+        print(e)
 
     try:
         slack_url = json.loads(secret)[SLACK_SECRET_KEY_NAME]
@@ -386,8 +381,8 @@ def lambda_handler(event, context):
     try:
         publish_forecast(boto3)
     except Exception as e:
-        logger.error("Failed: publish_forecast")
-        raise e
+        print(e)
+        raise Exception("Cannot connect to Cost Explorer with boto3")
 
 def main():
     try:
