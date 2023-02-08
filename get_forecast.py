@@ -53,6 +53,8 @@ from base64 import b64decode
 
 logging.basicConfig(level = logging.INFO)
 logger = logging.getLogger()
+  
+  
 AWSGENIE_SECRET_MANAGER="awsgenie_secret_manager"
 SLACK_SECRET_KEY_NAME="slack_url"
 TEAMS_SECRET_KEY_NAME="teams_url"
@@ -155,7 +157,7 @@ def display_output(boto3_session, message):
         slack_url = json.loads(secret)[SLACK_SECRET_KEY_NAME]
         send_slack(slack_url, message)
     except Exception as e:
-        logger.info("Disabling Slack, URL not found", e)
+        logger.info("Disabling Slack, URL not found")
 
     try:
         teams_url = json.loads(secret)[TEAMS_SECRET_KEY_NAME]
@@ -168,6 +170,7 @@ def display_output(boto3_session, message):
         send_sns(boto3_session, sns_arn, message)
     except Exception as e:
         logger.info("Disabling SNS, Arn not found")
+        
     print(message)
 
 

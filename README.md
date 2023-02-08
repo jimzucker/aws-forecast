@@ -31,14 +31,6 @@ We use these to make it compatible with running the same script from Lambda and 
 
 ### Cloud Formation
 If you enter and slack URL and/or SNS it will publish in addition to logging.
-If you do this, you must also do the follow
-	Go to Secrets Manager, and get the ARN of the secret that has the Slack and Teams URL's that you provided on creation.
-    Go to your lambda function -> Configuration -> Permissions -> Click on the role
-    Add Permissions -> Create Inline Policy
-    Choose Service - Secrets Manager
-    Action - GetSecretValue
-    Resource - Specific -> Add ARN -> Insert ARN of your Secret. -> Add
-    Create Policy
 
 #### File: get_forecast_cf.yaml
 ![Cloud Formation Inputs ](https://github.com/jimzucker/aws-forecast/blob/main/images/cloudformation_inputs.png)
