@@ -53,8 +53,8 @@ from base64 import b64decode
 
 logging.basicConfig(level = logging.INFO)
 logger = logging.getLogger()
-  
-  
+
+
 AWSGENIE_SECRET_MANAGER="awsgenie_secret_manager"
 SLACK_SECRET_KEY_NAME="slack_url"
 TEAMS_SECRET_KEY_NAME="teams_url"
@@ -111,7 +111,7 @@ def send_teams(teams_url, message):
     teams_message = {
         'text': message
     }
-
+    
     req = Request(teams_url, json.dumps(teams_message).encode('utf-8'))
     try:
         response = urlopen(req)
