@@ -326,7 +326,7 @@ def calc_forecast(boto3_session):
 
 def format_rows(output, account_width):
     # print the heading
-    forecast_width = 14
+    forecast_width = 8
     change_width = 8
 
     total_forecast = 0
@@ -364,7 +364,7 @@ def publish_forecast(boto3_session) :
         columns_displayed=os.environ['GET_FORECAST_COLUMNS_DISPLAYED']
         columns_displayed = columns_displayed.split(',')
 
-    account_width=17
+    account_width=12
     if 'GET_FORECAST_ACCOUNT_COLUMN_WIDTH' in os.environ:
         account_width=os.environ['GET_FORECAST_ACCOUNT_COLUMN_WIDTH']
 
