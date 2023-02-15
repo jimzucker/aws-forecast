@@ -324,41 +324,56 @@ def calc_forecast(boto3_session):
     return output
 
 
-def format_rows(output,account_width):
-    #print the heading
-    mtd_width=8
-    forecast_width=8
-    change_width=6
+def format_rows(output, account_width):
+    # print the heading
+    forecast_width = 14
+    change_width = 8
 
-    output_rows=[]
+    output_rows = []
+    total_forecast = 0
+    total_change = 0
 
-    row = {
-        "Account": 'Account'.ljust(account_width),
-        "MTD": 'MTD'.rjust(mtd_width),
-        "Forecast": 'Forecast'.rjust(forecast_width),
-        "Change": 'Change'.rjust(change_width)
+    # add up forecasts and calculate average change
+    for line in output:
+        total_forecast += line.get('amount_forecast')
+        total_change += line.get('forecast_variance')
+    avg_change = "{0:,.1f}%".format(total_change / len(output))
+
+    # add new row for AWS usage
+    row_aws = {
+        "Account": "AWS Usage".ljust(account_width),
+        "Forecast": "${0:,.0f}".format(total_forecast).ljust(forecast_width+1),
+        "Change": avg_change.ljust(change_width)
     }
-    output_rows.append(row)
+    output_rows.append(row_aws)
+    
+    # add new row for column headings
+    row_headings = {
+        "Account": "Account".ljust(account_width + 4),
+        "Forecast": "Forecast".ljust(forecast_width-2),
+        "Change": "Change".rjust(change_width)
+    }
+    output_rows.append(row_headings)
 
-    #print in decending order by forecast
+    # print in descending order by forecast
     lines = sorted(output, key=lambda k: k.get('amount_forecast'), reverse=True)
-    for line in lines :
+    for line in lines:
         if len(lines) == 2 and line.get('account_name') == 'Total':
             continue
         change = "{0:,.1f}%".format(line.get('forecast_variance'))
         row = {
             "Account": line.get('account_name')[:account_width].ljust(account_width),
-            "MTD": "${0:,.0f}".format(line.get('amount_usage')).rjust(mtd_width),
-            "Forecast": "${0:,.0f}".format(line.get('amount_forecast')).rjust(forecast_width),
-            "Change": change.rjust(change_width)
+            "Forecast": "${0:,.0f}".format(line.get('amount_forecast')).ljust(forecast_width),
+            "Change": change.ljust(change_width)
         }
         output_rows.append(row)
-        
+
     return output_rows
+
 
 def publish_forecast(boto3_session) :
     #read params
-    columns_displayed = ["Account", "MTD", "Forecast", "Change"]
+    columns_displayed = ["Account", "Forecast", "Change"]
     if 'GET_FORECAST_COLUMNS_DISPLAYED' in os.environ:
         columns_displayed=os.environ['GET_FORECAST_COLUMNS_DISPLAYED']
         columns_displayed = columns_displayed.split(',')
@@ -370,14 +385,10 @@ def publish_forecast(boto3_session) :
     output = calc_forecast(boto3_session)
     formated_rows = format_rows(output, account_width)
 
-    message=""
-    for line in formated_rows :
-        formated_line=""
-        for column in columns_displayed :
-            if formated_line != "" :
-                formated_line += " "
-            formated_line += line.get(column)
-        message += formated_line.rstrip() + "\n"
+    message = ""
+    for row in formated_rows:
+        message += row['Account'] + " | " + row['Forecast'] + " | " + row['Change'] + "\n"
+
     display_output(boto3_session, message)
 
 def lambda_handler(event, context):
