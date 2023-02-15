@@ -53,8 +53,8 @@ from base64 import b64decode
 
 logging.basicConfig(level = logging.INFO)
 logger = logging.getLogger()
-  
-  
+
+
 AWSGENIE_SECRET_MANAGER="awsgenie_secret_manager"
 SLACK_SECRET_KEY_NAME="slack_url"
 TEAMS_SECRET_KEY_NAME="teams_url"
@@ -86,7 +86,7 @@ def send_slack(slack_url, message):
         return
 
     slack_message = {
-        'text': message
+        'text': '```\n' + message + '```\n'
     }
 
     req = Request(slack_url, json.dumps(slack_message).encode('utf-8'))
@@ -109,7 +109,7 @@ def send_teams(teams_url, message):
         return
 
     teams_message = {
-        'text': message
+        'text': '```\n' + message + '```\n'
     }
 
     req = Request(teams_url, json.dumps(teams_message).encode('utf-8'))
@@ -324,41 +324,42 @@ def calc_forecast(boto3_session):
     return output
 
 
-def format_rows(output,account_width):
-    #print the heading
-    mtd_width=8
-    forecast_width=8
-    change_width=6
+def format_rows(output, account_width):
+    # print the heading
+    forecast_width = 14
+    change_width = 8
 
-    output_rows=[]
+    total_forecast = 0
+    total_change = 0
+    
+    output_rows = []
 
-    row = {
-        "Account": 'Account'.ljust(account_width),
-        "MTD": 'MTD'.rjust(mtd_width),
-        "Forecast": 'Forecast'.rjust(forecast_width),
-        "Change": 'Change'.rjust(change_width)
+    # add new row for column headings
+    row_headings = {
+        "Account": "Account".ljust(account_width),
+        "Forecast": "Forecast".ljust(forecast_width),
+        "Change": "Change".ljust(change_width)
     }
-    output_rows.append(row)
+    
+    output_rows.append(row_headings)
 
-    #print in decending order by forecast
+    # print in descending order by forecast
     lines = sorted(output, key=lambda k: k.get('amount_forecast'), reverse=True)
-    for line in lines :
+    for line in lines:
         if len(lines) == 2 and line.get('account_name') == 'Total':
             continue
         change = "{0:,.1f}%".format(line.get('forecast_variance'))
         row = {
             "Account": line.get('account_name')[:account_width].ljust(account_width),
-            "MTD": "${0:,.0f}".format(line.get('amount_usage')).rjust(mtd_width),
-            "Forecast": "${0:,.0f}".format(line.get('amount_forecast')).rjust(forecast_width),
-            "Change": change.rjust(change_width)
+            "Forecast": "${0:,.0f}".format(line.get('amount_forecast')).ljust(forecast_width),
+            "Change": change.ljust(change_width)
         }
         output_rows.append(row)
-        
     return output_rows
 
 def publish_forecast(boto3_session) :
     #read params
-    columns_displayed = ["Account", "MTD", "Forecast", "Change"]
+    columns_displayed = ["Account", "Forecast", "Change"]
     if 'GET_FORECAST_COLUMNS_DISPLAYED' in os.environ:
         columns_displayed=os.environ['GET_FORECAST_COLUMNS_DISPLAYED']
         columns_displayed = columns_displayed.split(',')
@@ -370,14 +371,10 @@ def publish_forecast(boto3_session) :
     output = calc_forecast(boto3_session)
     formated_rows = format_rows(output, account_width)
 
-    message=""
-    for line in formated_rows :
-        formated_line=""
-        for column in columns_displayed :
-            if formated_line != "" :
-                formated_line += " "
-            formated_line += line.get(column)
-        message += formated_line.rstrip() + "\n"
+    message = ""
+    for row in formated_rows:
+        message += row['Account'] + " | " + row['Forecast'] + " | " + row['Change'] + "\n"
+
     display_output(boto3_session, message)
 
 def lambda_handler(event, context):
