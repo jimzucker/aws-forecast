@@ -329,9 +329,6 @@ def format_rows(output, account_width):
     forecast_width = 8
     change_width = 8
 
-    total_forecast = 0
-    total_change = 0
-    
     output_rows = []
 
     # add new row for column headings
@@ -372,6 +369,13 @@ def publish_forecast(boto3_session) :
     formated_rows = format_rows(output, account_width)
 
     message = ""
+    for line in formated_rows:
+        formated_line = ""
+        for column in columns_displayed:
+            if formated_line != "":
+                formated_line += " "
+            formated_line += line.get(column)
+
     for row in formated_rows:
         message += row['Account'] + " | " + row['Forecast'] + " | " + row['Change'] + "\n"
 
