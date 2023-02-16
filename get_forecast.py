@@ -325,9 +325,9 @@ def calc_forecast(boto3_session):
     return output
 
 
-def format_rows(output, account_width):
+def format_rows(output,account_width):
     # print the heading
-    mtd_width=8
+    mtd_width = 8
     forecast_width = 8
     change_width = 8
 
