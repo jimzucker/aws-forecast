@@ -85,6 +85,7 @@ def send_slack(slack_url, message):
     if slack_url == "":
         return
 
+    #Slack and Teams have varying levels of support for mrkdown etc. This is provisioning for future use.
     slack_message = {
         'text': '```\n' + message + '```\n'
     }
