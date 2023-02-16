@@ -80,14 +80,14 @@ def get_secret(sm_client):
     return secret
 
 
-def send_slack(slack_url, message):
+def send_slack(slack_url, code_block_format_message):
     #make it a NOP if URL is NULL
     if slack_url == "":
         return
 
     #Slack and Teams have varying levels of support for mrkdown etc. This is provisioning for future use.
     slack_message = {
-        'text': '```\n' + message + '```\n'
+        'text': code_block_format_message 
     }
 
     req = Request(slack_url, json.dumps(slack_message).encode('utf-8'))
@@ -104,13 +104,13 @@ def send_slack(slack_url, message):
         logger.error("slack_url= %s", slack_url)
         raise e
   
-def send_teams(teams_url, message):
+def send_teams(teams_url, code_block_format_message):
     #make it a NOP if URL is NULL
     if teams_url == "":
         return
 
     teams_message = {
-        'text': '```\n' + message + '```\n'
+        'text': code_block_format_message
     }
 
     req = Request(teams_url, json.dumps(teams_message).encode('utf-8'))
@@ -380,11 +380,9 @@ def publish_forecast(boto3_session) :
                 formated_line += " | "
             formated_line += line.get(column)
         message += formated_line.rstrip() + "\n"
-        
-    #for row in formated_rows:
-        #message += row['Account'] + " | " + row['Forecast'] + " | " + row['Change'] + "\n"
 
-    display_output(boto3_session, message)
+    code_block_format_message = '```\n' + message + '```\n'
+    display_output(boto3_session, code_block_format_message)
 
 def lambda_handler(event, context):
     try:
