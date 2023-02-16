@@ -80,14 +80,14 @@ def get_secret(sm_client):
     return secret
 
 
-def send_slack(slack_url, code_block_format_message):
+def send_slack(slack_url, text_message):
     #make it a NOP if URL is NULL
     if slack_url == "":
         return
 
     #Slack and Teams have varying levels of support for mrkdown etc. This is provisioning for future use.
     slack_message = {
-        'text': code_block_format_message 
+        'text': text_message 
     }
 
     req = Request(slack_url, json.dumps(slack_message).encode('utf-8'))
@@ -104,13 +104,13 @@ def send_slack(slack_url, code_block_format_message):
         logger.error("slack_url= %s", slack_url)
         raise e
   
-def send_teams(teams_url, code_block_format_message):
+def send_teams(teams_url, text_message):
     #make it a NOP if URL is NULL
     if teams_url == "":
         return
 
     teams_message = {
-        'text': code_block_format_message
+        'text': text_message
     }
 
     req = Request(teams_url, json.dumps(teams_message).encode('utf-8'))
@@ -382,6 +382,7 @@ def publish_forecast(boto3_session) :
         message += formated_line.rstrip() + "\n"
 
     code_block_format_message = '```\n' + message + '```\n'
+    
     display_output(boto3_session, code_block_format_message)
 
 def lambda_handler(event, context):
