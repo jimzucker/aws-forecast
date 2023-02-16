@@ -21,7 +21,7 @@ So I set out to automate this as a slack post daily to save time.  While doing t
 We use these to make it compatible with running the same script from Lambda and the commandline for testing
 
 	GET_FORECAST_COLUMNS_DISPLAYED - specify columnns to display and the order 
-	    default: "Account,MTD,Forecast,Change"
+	    default: "Account,Forecast,Change"
 
 	GET_FORECAST_ACCOUNT_COLUMN_WIDTH - max width for account name for formatting
 		default: 17
