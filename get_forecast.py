@@ -360,7 +360,7 @@ def format_rows(output,account_width):
 
 def publish_forecast(boto3_session) :
     #read params
-    columns_displayed = ["Account", "Forecast", "Change"]
+    columns_displayed = ["Account","MTD", "Forecast", "Change"]
     if 'GET_FORECAST_COLUMNS_DISPLAYED' in os.environ:
         columns_displayed=os.environ['GET_FORECAST_COLUMNS_DISPLAYED']
         columns_displayed = columns_displayed.split(',')
