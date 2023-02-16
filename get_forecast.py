@@ -326,6 +326,7 @@ def calc_forecast(boto3_session):
 
 def format_rows(output, account_width):
     # print the heading
+    mtd_width=8
     forecast_width = 8
     change_width = 8
 
@@ -334,6 +335,7 @@ def format_rows(output, account_width):
     # add new row for column headings
     row_headings = {
         "Account": "Account".ljust(account_width),
+        "MTD": 'MTD'.ljust(mtd_width),
         "Forecast": "Forecast".ljust(forecast_width),
         "Change": "Change".ljust(change_width)
     }
@@ -348,6 +350,7 @@ def format_rows(output, account_width):
         change = "{0:,.1f}%".format(line.get('forecast_variance'))
         row = {
             "Account": line.get('account_name')[:account_width].ljust(account_width),
+            "MTD": "${0:,.0f}".format(line.get('amount_usage')).ljust(mtd_width),
             "Forecast": "${0:,.0f}".format(line.get('amount_forecast')).ljust(forecast_width),
             "Change": change.ljust(change_width)
         }
@@ -373,11 +376,12 @@ def publish_forecast(boto3_session) :
         formated_line = ""
         for column in columns_displayed:
             if formated_line != "":
-                formated_line += " "
+                formated_line += " | "
             formated_line += line.get(column)
-
-    for row in formated_rows:
-        message += row['Account'] + " | " + row['Forecast'] + " | " + row['Change'] + "\n"
+        message += formated_line.rstrip() + "\n"
+        
+    #for row in formated_rows:
+        #message += row['Account'] + " | " + row['Forecast'] + " | " + row['Change'] + "\n"
 
     display_output(boto3_session, message)
 
