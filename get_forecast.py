@@ -342,7 +342,10 @@ def format_rows(output,account_width):
     }
     
     output_rows.append(row_headings)
-
+    
+    divider = "-" * len(row_headings)
+    output_rows.append(divider)
+    
     # print in descending order by forecast
     lines = sorted(output, key=lambda k: k.get('amount_forecast'), reverse=True)
     for line in lines:
