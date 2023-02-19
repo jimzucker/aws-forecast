@@ -343,8 +343,16 @@ def format_rows(output,account_width):
     
     output_rows.append(row_headings)
     
-    divider = "-" * len(row_headings)
-    output_rows.append(divider)
+    # add a separator row
+    separator_row = {
+        "Account": "".ljust(account_width, "-"),
+        "MTD": "".ljust(mtd_width, "-"),
+        "Forecast": "".ljust(forecast_width, "-"),
+        "Change": "".ljust(change_width, "-")
+    }
+
+    output_rows.append(separator_row)
+    
     
     # print in descending order by forecast
     lines = sorted(output, key=lambda k: k.get('amount_forecast'), reverse=True)
