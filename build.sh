@@ -15,4 +15,4 @@ aws s3 --profile jim-zucker cp get_forecast.zip s3://jimzucker-github-getforecas
 #       Access Level - PutObject, GetObject, and ListBucket
 #       Resources - Specify ARN of the S3 Bucket, as well as the object that will be being replaced.
 #       Give the role a name and a description, and create role
-# 4) Share your external ID with the third party.
+# 4) Share your external ID with the third party, as well as the ARN of the IAM Role that was created.
