@@ -16,3 +16,6 @@ aws s3 --profile jim-zucker cp get_forecast.zip s3://jimzucker-github-getforecas
 #       Resources - Specify ARN of the S3 Bucket, as well as the object that will be being replaced.
 #       Give the role a name and a description, and create role
 # 4) Share your external ID with the third party, as well as the ARN of the IAM Role that was created.
+# 5) Ask the third party for the ARN of their IAM USER that will be ASSUMING your ROLE. Go to the role you created, and set the Principal of the 
+
+aws sts assume-role --role-arn arn:aws:iam::760967184165:policy/subash-deploy-get-forecast --role-session-name get_forecast_update --external-id subashc2023 --profile forecaster
