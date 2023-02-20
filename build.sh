@@ -6,6 +6,6 @@ aws s3 --profile jim-zucker cp get_forecast.zip s3://jimzucker-github-getforecas
 cd ..
 
 # Check IAM_Configuration for Instructions on how to upload updated code to this bucket.
- # Link to IAM Configuration document: [IAM_Configuration](./IAM_Configuration.md)
+ # Link to IAM Configuration document: https://github.com/subashc2023/aws-forecast/blob/formatfixer/IAM_Configuration.md
 
 
