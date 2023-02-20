@@ -4,6 +4,9 @@ To enable posting the message to Slack you must define a secret in secrets manag
 # Enabling SNS
 To enable posting the message to SNS you must define a secret in secrets manager called 'awsgenie_secret_manager' with key=sns_arn and value=<sns arn>.
 
+# Enabling Teams
+To enable posting the message to Teams you must define a secret in secrets manager called 'awsgenie_secret_manager' with key=teams_url and value=<teams url>.
+
 ![Enabling Slack](https://github.com/jimzucker/aws-forecast/blob/main/images/aws_secret.png)
 
 # Setting up Lambda

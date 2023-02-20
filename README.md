@@ -21,16 +21,16 @@ So I set out to automate this as a slack post daily to save time.  While doing t
 We use these to make it compatible with running the same script from Lambda and the commandline for testing
 
 	GET_FORECAST_COLUMNS_DISPLAYED - specify columnns to display and the order 
-	    default: "Account,MTD,Forecast,Change"
+	    default: "Account,Forecast,Change"
 
 	GET_FORECAST_ACCOUNT_COLUMN_WIDTH - max width for account name for formatting
-		default: 17
+		default: 12
 
 	AWS_LAMBDA_FUNCTION_NAME - set if running in lambda(Automatically set in Lambda)
 	GET_FORECAST_AWS_PROFILE - set for testing on command line to pick a profile from your credentials file
 
 ### Cloud Formation
-If you enter and slack URL and/or SNS it will publish in addition to logging.
+If you enter and slack URL and/or SNS and/or Teams URL it will publish in addition to logging.
 
 #### File: get_forecast_cf.yaml
 ![Cloud Formation Inputs ](https://github.com/jimzucker/aws-forecast/blob/main/images/cloudformation_inputs.png)
