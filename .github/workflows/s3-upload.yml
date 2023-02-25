@@ -29,7 +29,7 @@ jobs:
       - name: Zip file
         run: zip get_forecast.zip ../get_forecast.py
       - name: Upload file to S3
-        run: aws s3 cp get_forecast.zip s3://subashc2023-bucket
+        run: aws s3 cp get_forecast.zip s3://jimzucker-github-getforecast
       - name: Change working directory back to the root
         run: cd ..
       - name: Delete target directory
