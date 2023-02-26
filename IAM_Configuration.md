@@ -15,7 +15,7 @@
 
 
 The trust Policy of your S3 Bucket should look like this.
-
+```
 {
     "Version": "2012-10-17",
     "Id": "AllowOtherAWSAccountToAccessS3Bucket",
@@ -39,3 +39,4 @@ The trust Policy of your S3 Bucket should look like this.
         }
     ]
 }
+```
