@@ -34,6 +34,7 @@ We use these to make it compatible with running the same script from Lambda and 
 This application uses a Github Workflow to upload the get-forecast.py lambda function to Amazon S3. 
 To get this working properly, you need to configure your Github Secrets as follows, by providing it Credentials that have permission to access the S3 Bucket.
 For more information on giving permissions to access S3 Buckets through IAM Roles, see [IAM Configuration.md](https://github.com/jimzucker/aws-forecast/blob/main/IAM_Configuration.md)
+Go to your repository settings -> Secrets and Variables, and create these 2 secrets.
 	AWS_ACCESS_KEY = <AWS Access Key ID>
 	AWS_SECRET_KEY = <AWS Secret Access Key>
 
