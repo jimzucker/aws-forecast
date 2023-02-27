@@ -5,7 +5,7 @@
     Require External ID, and create a unique password or phrase you can share with this user.
 3) Create a Policy
     Service - S3
-    Access Level - PutObject, GetObject, DeleteBucket, and ListBucket. If your bucket has ACL's, then you also need PutObjectACL and GetObjectACL.
+    Access Level - PutObject, GetObject, DeleteObject, and ListBucket. If your bucket has ACL's, then you also need PutObjectACL and GetObjectACL.
     Resources - Specify ARN of the S3 Bucket, as well as the object that will be being replaced.
     Attach the policy to a role.
     Give the role a name and a description, and make sure that the trusted relationships of the role enables the STSAssumeRole Action to the Principal AWS Account, and create role
@@ -15,6 +15,7 @@
 
 
 The trust Policy of your S3 Bucket should look like this.
+
 ```
 {
     "Version": "2012-10-17",
@@ -40,3 +41,4 @@ The trust Policy of your S3 Bucket should look like this.
     ]
 }
 ```
+
