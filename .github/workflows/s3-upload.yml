@@ -24,5 +24,3 @@ jobs:
         run: zip get_forecast.zip get_forecast.py
       - name: Upload file to S3
         run: aws s3 cp get_forecast.zip s3://jimzucker-github-getforecast
-      - name: Upload file to S3
-        run: aws s3 cp get_forecast.zip s3://jimzucker-github-getforecast
