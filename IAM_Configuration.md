@@ -41,3 +41,4 @@ The trust Policy of your S3 Bucket should look like this.
     ]
 }
 ```
+
