@@ -309,10 +309,15 @@ def calc_forecast(boto3_session):
             if amount_usage_prior_month > 0 :
                 variance = (amount_forecast-amount_usage_prior_month) / amount_usage_prior_month *100
 
-            try: 
-                account_name=org.describe_account(AccountId=linked_account)['Account']['Name']
-            except AWSOrganizationsNotInUseException as e:
-                account_name=linked_account
+            # Fall back to the raw account id if describe_account fails for
+            # any reason: AWS Organizations not in use, missing IAM permission
+            # (organizations:DescribeAccount), throttling, a closed account, etc.
+            try:
+                account_name = org.describe_account(
+                    AccountId=linked_account
+                )['Account']['Name']
+            except Exception:
+                account_name = linked_account
 
             result = {
                 "account_name": account_name,
@@ -376,9 +381,24 @@ def publish_forecast(boto3_session) :
         columns_displayed=os.environ['GET_FORECAST_COLUMNS_DISPLAYED']
         columns_displayed = columns_displayed.split(',')
 
-    account_width=12
+    account_width = 12
     if 'GET_FORECAST_ACCOUNT_COLUMN_WIDTH' in os.environ:
-        account_width=os.environ['GET_FORECAST_ACCOUNT_COLUMN_WIDTH']
+        raw_width = os.environ['GET_FORECAST_ACCOUNT_COLUMN_WIDTH']
+        try:
+            account_width = int(raw_width)
+        except (TypeError, ValueError):
+            logger.warning(
+                "GET_FORECAST_ACCOUNT_COLUMN_WIDTH=%r is not an integer; "
+                "falling back to default of %d",
+                raw_width, account_width,
+            )
+        if account_width <= 0:
+            logger.warning(
+                "GET_FORECAST_ACCOUNT_COLUMN_WIDTH=%r is not positive; "
+                "falling back to default of 12",
+                raw_width,
+            )
+            account_width = 12
 
     output = calc_forecast(boto3_session)
     formated_rows = format_rows(output, account_width)

@@ -120,6 +120,30 @@ class CalcForecastFallbackTests(unittest.TestCase):
             self.assertEqual(row["amount_forecast"], row["amount_usage"])
             self.assertEqual(row["amount_forecast"], 500.0)
 
+    def test_describe_account_failure_falls_back_to_account_id(self):
+        """If org.describe_account raises (Organizations not in use,
+        missing permission, closed account, throttling, ...), the
+        account_name should fall back to the raw linked-account id
+        instead of crashing."""
+        self.ce.get_cost_and_usage.side_effect = [
+            usage_response("500.00"),
+            usage_response("400.00"),
+            grouped_usage_response([("123456789012", "500.00")]),
+            usage_response("400.00"),
+        ]
+        self.ce.get_cost_forecast.side_effect = [
+            forecast_response("800.00"),
+            forecast_response("800.00"),
+        ]
+        # Simulate AWS Organizations not in use.
+        self.org.describe_account.side_effect = RuntimeError(
+            "AWSOrganizationsNotInUseException"
+        )
+
+        output = get_forecast.calc_forecast(self.session)
+        # First row is the synthetic "Total"; second is the per-account row.
+        self.assertEqual(output[1]["account_name"], "123456789012")
+
 
 class CalcForecastPaginationTests(unittest.TestCase):
     def setUp(self):

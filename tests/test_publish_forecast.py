@@ -113,6 +113,73 @@ class PublishForecastEnvOverrideTests(unittest.TestCase):
             self.assertNotIn(" | ", line)
 
 
+class PublishForecastAccountWidthTests(unittest.TestCase):
+    """Covers GET_FORECAST_ACCOUNT_COLUMN_WIDTH parsing — especially that
+    string values from the environment get coerced to int before being
+    handed to str.ljust."""
+
+    def setUp(self):
+        self.session = make_mock_boto3_session()
+
+    def _run_and_get_message(self):
+        with patch.object(get_forecast, "calc_forecast",
+                          return_value=SAMPLE_OUTPUT), \
+             patch.object(get_forecast, "display_output") as display:
+            get_forecast.publish_forecast(self.session)
+            return display.call_args.args[1]
+
+    def _account_column_width(self, message):
+        """Extract the rendered width of the Account column from the
+        separator row (the all-dashes line)."""
+        for line in message.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("-") and "-" in stripped:
+                # Separator row looks like "-------- | -------- | --------"
+                first_cell = line.split("|", 1)[0].rstrip()
+                return len(first_cell)
+        raise AssertionError("separator row not found in message")
+
+    def test_numeric_string_env_is_coerced_to_int(self):
+        """An integer-as-string env var must be parsed to int and used
+        as the actual column width — the original bug was passing the
+        raw string to str.ljust, which raises TypeError."""
+        with _EnvScope(
+            GET_FORECAST_COLUMNS_DISPLAYED=None,
+            GET_FORECAST_ACCOUNT_COLUMN_WIDTH="20",
+        ):
+            message = self._run_and_get_message()
+        self.assertEqual(self._account_column_width(message), 20)
+
+    def test_non_numeric_env_falls_back_to_default(self):
+        """A non-numeric value should not crash — publish_forecast should
+        log a warning and use the default width of 12."""
+        with _EnvScope(
+            GET_FORECAST_COLUMNS_DISPLAYED=None,
+            GET_FORECAST_ACCOUNT_COLUMN_WIDTH="not-a-number",
+        ):
+            message = self._run_and_get_message()
+        self.assertEqual(self._account_column_width(message), 12)
+
+    def test_non_positive_env_falls_back_to_default(self):
+        """Zero or negative widths make no sense for a column; fall back."""
+        for bad in ("0", "-5"):
+            with self.subTest(value=bad):
+                with _EnvScope(
+                    GET_FORECAST_COLUMNS_DISPLAYED=None,
+                    GET_FORECAST_ACCOUNT_COLUMN_WIDTH=bad,
+                ):
+                    message = self._run_and_get_message()
+                self.assertEqual(self._account_column_width(message), 12)
+
+    def test_default_width_when_env_unset(self):
+        with _EnvScope(
+            GET_FORECAST_COLUMNS_DISPLAYED=None,
+            GET_FORECAST_ACCOUNT_COLUMN_WIDTH=None,
+        ):
+            message = self._run_and_get_message()
+        self.assertEqual(self._account_column_width(message), 12)
+
+
 class PublishForecastIntegrationTests(unittest.TestCase):
     def setUp(self):
         self.session = make_mock_boto3_session()
