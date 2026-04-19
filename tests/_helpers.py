@@ -1,5 +1,45 @@
 """Shared helpers and mock factories for the test suite."""
+import logging
+from contextlib import contextmanager
 from unittest.mock import MagicMock
+
+
+@contextmanager
+def logging_enabled(level=logging.DEBUG):
+    """Temporarily re-enable logging that ``tests/__init__.py`` disabled.
+
+    The test bootstrap calls ``logging.disable(CRITICAL)`` to keep
+    exception-path tests quiet. Some tests, however, need to *capture*
+    log records (e.g. to assert a logger.error call formats cleanly
+    without raising TypeError). Use this context manager together with
+    ``TestCase.assertLogs`` to turn logging back on for the duration of
+    a block.
+    """
+    previous = logging.root.manager.disable
+    logging.disable(logging.NOTSET)
+    try:
+        yield
+    finally:
+        logging.disable(previous)
+
+
+def assert_records_format_cleanly(test_case, records):
+    """Assert every LogRecord renders via ``getMessage()`` without raising.
+
+    This catches the classic ``logger.error("prefix:", e)`` bug where the
+    format string has no ``%s`` placeholder but positional args were
+    supplied — ``LogRecord.getMessage`` raises ``TypeError`` in that
+    case and the real exception detail is lost.
+    """
+    for record in records:
+        try:
+            rendered = record.getMessage()
+        except TypeError as exc:  # pragma: no cover - diagnostic path
+            test_case.fail(
+                "Log record did not format cleanly: "
+                f"fmt={record.msg!r} args={record.args!r} error={exc}"
+            )
+        test_case.assertIsInstance(rendered, str)
 
 
 def make_mock_boto3_session():

@@ -73,9 +73,9 @@ def get_secret(sm_client):
         secret = sm_client.get_secret_value( SecretId=AWSGENIE_SECRET_MANAGER )["SecretString"]
     except Exception as e:
         if e.response['Error']['Code'] == 'InvalidRequestException':
-            logger.error("The request was invalid due to:", e)
+            logger.error("The request was invalid due to: %s", e)
         elif e.response['Error']['Code'] == 'InvalidParameterException':
-            logger.error("The request had invalid params:", e)
+            logger.error("The request had invalid params: %s", e)
 
     return secret
 
@@ -164,7 +164,7 @@ def display_output(boto3_session, message):
         teams_url = json.loads(secret)[TEAMS_SECRET_KEY_NAME]
         send_teams(teams_url, message)
     except Exception as e:
-        logger.info("Disabling Teams, URL not found", e)
+        logger.info("Disabling Teams, URL not found: %s", e)
 
     try:
         sns_arn=json.loads(secret)[SNS_SECRET_KEY_NAME]

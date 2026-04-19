@@ -1,12 +1,17 @@
 """Unit tests for get_forecast.display_output."""
 import io
 import json
+import logging
 import unittest
 from contextlib import redirect_stdout
 from unittest.mock import patch
 
 import get_forecast
-from tests._helpers import make_mock_boto3_session
+from tests._helpers import (
+    assert_records_format_cleanly,
+    logging_enabled,
+    make_mock_boto3_session,
+)
 
 
 class DisplayOutputTests(unittest.TestCase):
@@ -97,6 +102,31 @@ class DisplayOutputTests(unittest.TestCase):
                 get_forecast.display_output, self.session, "still-prints"
             )
             self.assertIn("still-prints", stdout)
+
+    def test_teams_not_configured_log_record_formats_cleanly(self):
+        """Regression guard for the line 167 logger format-string bug.
+
+        When the secret JSON has no ``teams_url`` key, display_output hits
+        ``logger.info("Disabling Teams, URL not found: %s", e)``. Prior
+        to the fix the format string had no placeholder and passing the
+        exception as a positional arg raised TypeError at emit time.
+        """
+        self.secrets.get_secret_value.return_value = {
+            "SecretString": json.dumps({"slack_url": "https://slack/x"})
+        }
+        with patch.object(get_forecast, "send_slack"), \
+             patch.object(get_forecast, "send_teams"), \
+             patch.object(get_forecast, "send_sns"):
+            with logging_enabled():
+                with self.assertLogs(get_forecast.logger, level=logging.INFO) as cm:
+                    self._capture(
+                        get_forecast.display_output, self.session, "msg"
+                    )
+        assert_records_format_cleanly(self, cm.records)
+        self.assertTrue(
+            any("Disabling Teams" in r.getMessage() for r in cm.records),
+            f"expected Teams-disabled log; got: {[r.getMessage() for r in cm.records]}",
+        )
 
 
 if __name__ == "__main__":

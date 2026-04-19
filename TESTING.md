@@ -19,7 +19,7 @@ tests/
   test_entrypoints.py   lambda_handler + main (incl. GET_FORECAST_AWS_PROFILE)
 ```
 
-46 tests total.
+54 tests total.
 
 ## Running
 
@@ -76,9 +76,21 @@ While writing these tests a few latent issues surfaced in `get_forecast.py`.
   via `int()` with a warning + fallback to the default of 12 on non-numeric
   or non-positive input. Guarded by the four tests in
   `PublishForecastAccountWidthTests`.
+- **Logger format-string mismatches (lines 76, 78, 167)** —
+  `logger.error("The request was invalid due to:", e)`,
+  `logger.error("The request had invalid params:", e)`, and
+  `logger.info("Disabling Teams, URL not found", e)` all passed a
+  positional argument with no `%s` placeholder in the format string, so
+  the logging module raised `TypeError: not all arguments converted
+  during string formatting` at emit time and the exception detail was
+  lost. All three now include a `%s` placeholder. Guarded by
+  `GetSecretLogFormattingTests` (two tests) and
+  `test_teams_not_configured_log_record_formats_cleanly`, which use the
+  new `logging_enabled` / `assert_records_format_cleanly` helpers in
+  `tests/_helpers.py` to capture and render the real `LogRecord`.
 
 **Still latent (not fixed):**
 
-1. **Line 76 logger call** — `logger.error("...", e)` has no `%s` placeholder,
-   so the logging module raises a `TypeError` during formatting. The suite
-   suppresses this noise via `logging.disable`.
+_None currently tracked. See `get_forecast.py` line ~200 for remaining
+`logger.debug("key=", value)` calls that will also raise at DEBUG level,
+but those are gated off by the default log level so no runtime impact._
