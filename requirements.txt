@@ -1,16 +1,10 @@
-boto3==1.14.56
-botocore==1.17.56
-certifi==2020.6.20
-cffi==1.14.2
-chardet==3.0.4
-cryptography==3.1
-docutils==0.15.2
-idna==2.10
-jmespath==0.10.0
-pycparser==2.20
-pyOpenSSL==19.1.0
-python-dateutil==2.8.1
-requests==2.24.0
-s3transfer==0.3.3
-six==1.15.0
-urllib3==1.25.10
+# Runtime dependencies for the Lambda zip.
+#
+# AWS Lambda's python3.12 runtime ships boto3, botocore, urllib3, and the
+# usual transitive deps (six, jmespath, etc.) — pinning them here only
+# creates conflicts and pulls in stale CVEs. Keep this file minimal: list
+# only what get_forecast.py imports that the runtime does NOT already
+# provide.
+#
+# python-dateutil is used for relativedelta() in date math.
+python-dateutil>=2.8,<3

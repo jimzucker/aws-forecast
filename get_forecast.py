@@ -49,7 +49,6 @@ from botocore.exceptions import ClientError
 import json
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
-from base64 import b64decode
 
 logging.basicConfig(level = logging.INFO)
 logger = logging.getLogger()
@@ -197,10 +196,10 @@ def calc_forecast(boto3_session):
     first_day_next_month = (utcnow + relativedelta(months=1)).strftime("%Y-%m-01")
     first_day_prior_month = (utcnow + relativedelta(months=-1)).strftime("%Y-%m-01")
 
-    logger.debug("today=",today)
-    logger.debug("first_day_of_month=",first_day_of_month)
-    logger.debug("first_day_next_month=",first_day_next_month)
-    logger.debug("first_day_prior_month=",first_day_prior_month)
+    logger.debug("today=%s", today)
+    logger.debug("first_day_of_month=%s", first_day_of_month)
+    logger.debug("first_day_next_month=%s", first_day_next_month)
+    logger.debug("first_day_prior_month=%s", first_day_prior_month)
 
 
     #Get total cost_and_usage
@@ -428,7 +427,7 @@ def main():
         boto3_session = boto3.session.Session()
         if 'GET_FORECAST_AWS_PROFILE' in os.environ:
             profile_name=os.environ['GET_FORECAST_AWS_PROFILE']
-            logger.info("Setting AWS Proflie ="+profile_name)
+            logger.info("Setting AWS Profile=%s", profile_name)
             boto3_session = boto3.session.Session(profile_name=profile_name)
 
         try:
@@ -437,7 +436,7 @@ def main():
             raise e
 
     except Exception as e:
-        logger.error(e);
+        logger.exception("get_forecast main() failed: %s", e)
         sys.exit(1)
 
     sys.exit(0)

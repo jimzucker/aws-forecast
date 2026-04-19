@@ -73,6 +73,7 @@ Resources:
           - Effect: Allow
             Action:
             - ce:GetCostAndUsage
+            - ce:GetCostForecast
             Resource: "*"
           - Effect: Allow
             Action:
@@ -88,7 +89,7 @@ Resources:
       Role: !GetAtt getForecastFunctionRole.Arn
       Timeout: 30
       Handler: get_forecast.lambda_handler
-      Runtime: python3.9
+      Runtime: python3.12
       Code:
         S3Bucket: jimzucker-github-getforecast
         S3Key: get_forecast.zip
