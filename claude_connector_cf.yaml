@@ -1,0 +1,105 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS Cost Summary connector for Claude. Lambda Function URL gated by a bearer token in Secrets Manager.
+
+Parameters:
+  BearerToken:
+    NoEcho: true
+    Type: String
+    Description: Bearer token Claude must present in the Authorization header. Generate a random string (e.g. `openssl rand -hex 32`).
+    MinLength: 16
+
+  CodeS3Bucket:
+    Type: String
+    Description: S3 bucket containing the deployment zip.
+
+  CodeS3Key:
+    Type: String
+    Default: claude_connector.zip
+    Description: S3 key of the deployment zip.
+
+Resources:
+
+  bearerSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: aws_cost_claude_connector
+      Description: Bearer token for the AWS Cost Summary Claude connector.
+      SecretString: !Sub '{"claude_bearer_token": "${BearerToken}"}'
+
+  connectorRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Path: "/"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: cost-readonly
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ce:GetCostAndUsage
+                  - ce:GetCostForecast
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - organizations:DescribeAccount
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - sts:GetCallerIdentity
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource: !Ref bearerSecret
+
+  connectorLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: aws-cost-claude-connector
+      Role: !GetAtt connectorRole.Arn
+      Timeout: 30
+      MemorySize: 256
+      Handler: claude_connector_handler.lambda_handler
+      Runtime: python3.12
+      Code:
+        S3Bucket: !Ref CodeS3Bucket
+        S3Key: !Ref CodeS3Key
+
+  connectorLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: connectorLambda
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${connectorLambda}"
+      RetentionInDays: 7
+
+  connectorUrl:
+    Type: AWS::Lambda::Url
+    Properties:
+      AuthType: NONE
+      TargetFunctionArn: !GetAtt connectorLambda.Arn
+
+  connectorUrlInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref connectorLambda
+      Action: lambda:InvokeFunctionUrl
+      Principal: "*"
+      FunctionUrlAuthType: NONE
+
+Outputs:
+  FunctionUrl:
+    Description: HTTPS endpoint to register in Claude.
+    Value: !GetAtt connectorUrl.FunctionUrl
+  BearerTokenSecretArn:
+    Description: Secrets Manager ARN holding the bearer token.
+    Value: !Ref bearerSecret

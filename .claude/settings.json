@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bash .claude/skills/aws-cost-summary/run.sh)",
+      "Bash(python3 get_forecast.py)",
+      "Bash(python3 get_forecast.py:*)",
+      "Read(./**)"
+    ],
+    "deny": [
+      "Bash(aws iam:*)",
+      "Bash(aws s3 rm:*)",
+      "Bash(aws s3api delete-*:*)",
+      "Bash(aws ec2 terminate-instances:*)",
+      "Bash(aws ec2 stop-instances:*)",
+      "Bash(aws lambda delete-function:*)",
+      "Bash(aws lambda update-function-code:*)",
+      "Bash(aws lambda update-function-configuration:*)",
+      "Bash(aws cloudformation delete-stack:*)",
+      "Bash(aws cloudformation deploy:*)",
+      "Bash(aws secretsmanager delete-secret:*)",
+      "Bash(aws secretsmanager put-secret-value:*)",
+      "Bash(aws secretsmanager update-secret:*)",
+      "Bash(aws ce put-*:*)",
+      "Bash(aws organizations create-*:*)",
+      "Bash(aws organizations delete-*:*)"
+    ]
+  }
+}

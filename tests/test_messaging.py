@@ -94,5 +94,52 @@ class SendSnsTests(unittest.TestCase):
         )
 
 
+class PayloadEncodingTests(unittest.TestCase):
+    """Regression: Slack/Teams payloads must round-trip through JSON cleanly
+    even when the message contains characters that would break naive string
+    concatenation (unicode, triple backticks, newlines, large bodies)."""
+
+    def _captured_payload(self, urlopen, expected_url):
+        urlopen.assert_called_once()
+        req = urlopen.call_args.args[0]
+        self.assertEqual(req.full_url, expected_url)
+        return json.loads(req.data.decode("utf-8"))
+
+    def test_slack_payload_roundtrips_unicode(self):
+        msg = "Account résumé: $1,234 — forecast €5,678 ✓"
+        with patch.object(get_forecast, "urlopen") as urlopen:
+            urlopen.return_value.read.return_value = b"ok"
+            get_forecast.send_slack("https://hooks.slack.com/X", msg)
+            payload = self._captured_payload(urlopen, "https://hooks.slack.com/X")
+        self.assertEqual(payload, {"text": msg})
+
+    def test_teams_payload_roundtrips_unicode(self):
+        msg = "MTD спend: $12,345"
+        with patch.object(get_forecast, "urlopen") as urlopen:
+            urlopen.return_value.read.return_value = b"ok"
+            get_forecast.send_teams("https://teams.example.com/hook", msg)
+            payload = self._captured_payload(urlopen, "https://teams.example.com/hook")
+        self.assertEqual(payload, {"text": msg})
+
+    def test_slack_payload_with_triple_backticks_and_newlines(self):
+        """publish_forecast wraps the table in ``` code fences — make sure the
+        Slack payload still serializes when the message body contains them."""
+        msg = "```\nAccount      | Forecast | Change\n----------- | -------- | ------\nTotal       | $600     | 100.0%\n```\n"
+        with patch.object(get_forecast, "urlopen") as urlopen:
+            urlopen.return_value.read.return_value = b"ok"
+            get_forecast.send_slack("https://hooks.slack.com/X", msg)
+            payload = self._captured_payload(urlopen, "https://hooks.slack.com/X")
+        self.assertEqual(payload["text"], msg)
+        self.assertIn("```", payload["text"])
+
+    def test_large_payload_is_posted_intact(self):
+        msg = "x" * 10_000
+        with patch.object(get_forecast, "urlopen") as urlopen:
+            urlopen.return_value.read.return_value = b"ok"
+            get_forecast.send_slack("https://hooks.slack.com/X", msg)
+            payload = self._captured_payload(urlopen, "https://hooks.slack.com/X")
+        self.assertEqual(len(payload["text"]), 10_000)
+
+
 if __name__ == "__main__":
     unittest.main()
