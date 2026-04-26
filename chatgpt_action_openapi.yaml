@@ -1,0 +1,79 @@
+openapi: 3.1.0
+info:
+  title: AWS Cost Summary Action for ChatGPT
+  version: 1.0.0
+  description: |
+    Read-only AWS cost summary. Returns month-to-date spend, current-month
+    forecast, percent change vs prior month, and the same breakdown per
+    linked account. Designed to be imported as a Custom GPT Action.
+servers:
+  - url: https://REPLACE_ME.lambda-url.REGION.on.aws
+    description: Lambda Function URL output by the CloudFormation stack. Replace with the actual URL before importing into the GPT builder.
+paths:
+  /:
+    post:
+      operationId: getCostSummary
+      summary: Get the AWS cost summary.
+      description: Returns month-to-date spend, current-month forecast, percent change versus prior month, and a per-account breakdown.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Cost summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CostSummary'
+        '401':
+          description: Missing or invalid bearer token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+        '500':
+          description: Cost Explorer or Secrets Manager unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    CostSummary:
+      type: object
+      required: [total_mtd, total_forecast, percent_change, accounts]
+      properties:
+        total_mtd:
+          type: number
+          description: Month-to-date spend across all accounts, USD.
+        total_forecast:
+          type: number
+          description: Forecast for the current calendar month, USD.
+        percent_change:
+          type: number
+          description: Percent change of forecast vs prior month total. 100 means new account or no prior data.
+        accounts:
+          type: array
+          items:
+            $ref: '#/components/schemas/AccountSummary'
+    AccountSummary:
+      type: object
+      required: [name, mtd, forecast, percent_change]
+      properties:
+        name:
+          type: string
+        mtd:
+          type: number
+        forecast:
+          type: number
+        percent_change:
+          type: number
+    ErrorBody:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string

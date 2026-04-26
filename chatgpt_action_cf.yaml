@@ -1,0 +1,105 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS Cost Summary action for ChatGPT Custom GPTs. Lambda Function URL gated by a bearer token in Secrets Manager.
+
+Parameters:
+  BearerToken:
+    NoEcho: true
+    Type: String
+    Description: Bearer token ChatGPT must present in the Authorization header. Generate a random string (e.g. `openssl rand -hex 32`).
+    MinLength: 16
+
+  CodeS3Bucket:
+    Type: String
+    Description: S3 bucket containing the deployment zip.
+
+  CodeS3Key:
+    Type: String
+    Default: chatgpt_action.zip
+    Description: S3 key of the deployment zip.
+
+Resources:
+
+  bearerSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: aws_cost_chatgpt_action
+      Description: Bearer token for the AWS Cost Summary ChatGPT Custom GPT action.
+      SecretString: !Sub '{"chatgpt_bearer_token": "${BearerToken}"}'
+
+  actionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Path: "/"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: cost-readonly
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ce:GetCostAndUsage
+                  - ce:GetCostForecast
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - organizations:DescribeAccount
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - sts:GetCallerIdentity
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource: !Ref bearerSecret
+
+  actionLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: aws-cost-chatgpt-action
+      Role: !GetAtt actionRole.Arn
+      Timeout: 30
+      MemorySize: 256
+      Handler: chatgpt_action_handler.lambda_handler
+      Runtime: python3.12
+      Code:
+        S3Bucket: !Ref CodeS3Bucket
+        S3Key: !Ref CodeS3Key
+
+  actionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: actionLambda
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${actionLambda}"
+      RetentionInDays: 7
+
+  actionUrl:
+    Type: AWS::Lambda::Url
+    Properties:
+      AuthType: NONE
+      TargetFunctionArn: !GetAtt actionLambda.Arn
+
+  actionUrlInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref actionLambda
+      Action: lambda:InvokeFunctionUrl
+      Principal: "*"
+      FunctionUrlAuthType: NONE
+
+Outputs:
+  FunctionUrl:
+    Description: HTTPS endpoint to paste into ChatGPT GPT builder Actions.
+    Value: !GetAtt actionUrl.FunctionUrl
+  BearerTokenSecretArn:
+    Description: Secrets Manager ARN holding the bearer token.
+    Value: !Ref bearerSecret
