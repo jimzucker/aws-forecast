@@ -1,0 +1,42 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "aws cost",
+      "intents": [
+        {
+          "name": "AMAZON.HelpIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.CancelIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.StopIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.FallbackIntent",
+          "samples": []
+        },
+        {
+          "name": "WhatIsMyBillIntent",
+          "slots": [],
+          "samples": [
+            "what is my current bill",
+            "what's my current bill",
+            "what is my AWS bill",
+            "what's my AWS bill",
+            "how much am I spending",
+            "how much am I spending this month",
+            "what is my forecast",
+            "what's my forecast",
+            "my forecast",
+            "my bill"
+          ]
+        }
+      ],
+      "types": []
+    }
+  }
+}
