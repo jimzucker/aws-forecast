@@ -28,7 +28,9 @@ bash .claude/skills/aws-cost-summary/run.sh
 
 The script:
 1. Sets `GET_FORECAST_AWS_PROFILE` from `${AWS_COST_PROFILE:-aws-cost-readonly}`.
-2. Execs `python3 get_forecast.py`.
+2. Sets `AWS_DEFAULT_REGION` to `us-east-1` if unset (CE is global, but boto3 still requires a region).
+3. On first run only, creates a venv at `<repo>/.venv-skill/` and installs `boto3` + `python-dateutil`. PEP 668 blocks pip-installing into Homebrew/Debian/Ubuntu system Pythons, so we isolate. Subsequent runs reuse the venv.
+4. Execs `<repo>/.venv-skill/bin/python get_forecast.py`.
 
 The output is a fixed-width table with columns Account, MTD, Forecast, Change.
 Read the largest forecast row(s) and answer the user's question directly with
@@ -46,6 +48,7 @@ those numbers.
    ```
    aws configure --profile aws-cost-readonly
    ```
+   You can press Enter on the region prompt — `run.sh` defaults to `us-east-1` if the profile has no region set.
 3. (Optional) override the profile name with `export AWS_COST_PROFILE=<name>`.
 
 The skill remembers the **profile name**, never the credentials. Credentials

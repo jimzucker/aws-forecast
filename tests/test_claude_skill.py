@@ -39,13 +39,27 @@ class SkillFilesTests(unittest.TestCase):
 
     def test_run_sh_execs_get_forecast(self):
         text = RUN_SH.read_text()
-        self.assertIn("exec python3", text)
+        self.assertRegex(text, r"exec\s+\S*python\S*\s")
         self.assertIn("get_forecast.py", text)
 
     def test_run_sh_sets_aws_profile_from_env(self):
         text = RUN_SH.read_text()
         self.assertIn("GET_FORECAST_AWS_PROFILE", text)
         self.assertIn("AWS_COST_PROFILE", text)
+
+    def test_run_sh_defaults_aws_region(self):
+        """Profiles without a region must not crash; default to us-east-1."""
+        text = RUN_SH.read_text()
+        self.assertIn("AWS_DEFAULT_REGION", text)
+        self.assertIn("us-east-1", text)
+
+    def test_run_sh_uses_isolated_venv(self):
+        """PEP 668 blocks pip on system Pythons — skill must isolate in a venv."""
+        text = RUN_SH.read_text()
+        self.assertIn(".venv-skill", text)
+        self.assertIn("python3 -m venv", text)
+        self.assertIn("boto3", text)
+        self.assertIn("python-dateutil", text)
 
 
 class SkillFrontmatterTests(unittest.TestCase):
