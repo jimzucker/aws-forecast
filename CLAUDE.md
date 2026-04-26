@@ -9,9 +9,11 @@ Single-file Python tool (`get_forecast.py`) that reproduces AWS Cost Explorer UI
 ## Commands
 
 ```bash
-# Run tests (no AWS credentials needed — all AWS calls are mocked)
-python3 -m unittest discover -v         # stdlib only, zero dependencies
-pytest                                   # requires: pip install -r requirements-dev.txt
+# Run tests (no AWS credentials needed — all AWS calls are mocked).
+# Requires python-dateutil at minimum; install dev deps for the full toolchain.
+pip install -r requirements-dev.txt
+python3 -m unittest discover -v
+pytest
 pytest tests/test_calc_forecast.py      # single module
 pytest -k test_single_account           # single test by name
 
@@ -57,8 +59,10 @@ lambda_handler() / main()
 
 Tests in `tests/` use `unittest.mock` — no real AWS calls, no credentials needed.
 
-- `tests/__init__.py` — stubs boto3/botocore if not installed; disables logger output
+- `tests/__init__.py` — stubs boto3/botocore if not installed; disables logger output. Does **not** stub `python-dateutil`, which `get_forecast.py` imports at module load — install it before running the suite.
 - `tests/_helpers.py` — shared mock factories (`make_mock_boto3_session`, `usage_response`, `grouped_usage_response`, `forecast_response`, `logging_enabled`)
+
+Skill branches (`claudeskill`, `chatgptskill`, `alexaskill`) add tests that `import yaml`; install `pyyaml` (already pinned in `requirements-dev.txt`) before running their suites.
 
 The `logging_enabled()` context manager in `_helpers.py` is used to assert log output; use it when testing error/warning log paths.
 
