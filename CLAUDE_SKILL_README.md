@@ -24,10 +24,152 @@ A Claude skill that asks AWS Cost Explorer "what is my current spend / forecast 
 
 ## Prerequisites
 
-- An AWS account with permissions to deploy CloudFormation containing `Lambda`, `IAM::Role`, `SecretsManager::Secret`, `Lambda::Url`.
-- AWS CLI v2 configured locally (`aws configure --profile <admin>`). Every `aws` command below should be run with `--profile <admin> --region <your-region>`.
+- An AWS account with permissions to deploy CloudFormation containing `Lambda`, `IAM::Role`, `SecretsManager::Secret`, `Lambda::Url`. The "Deployer IAM policy" below is the tight version of those permissions if you don't already have an admin profile.
+- AWS CLI v2 configured locally (`aws configure --profile <deployer>`). Every `aws` command below should be run with `--profile <deployer> --region <your-region>`.
 - An S3 bucket in the same region for the Lambda zip — passed as `LAMBDA_BUCKET` env var.
-- Python 3.12 + `pip` to build the zip.
+- Python 3.12+ + `pip` to build the zip. On macOS Homebrew Python (PEP 668) `build_claude.sh` auto-creates a `.venv-build/` venv beside the repo so pip-install isn't blocked.
+
+## Deployer IAM policy
+
+The hosted-connector deploy needs CloudFormation, IAM, Lambda, S3, Secrets Manager, and CloudWatch Logs permissions. Rather than attaching `AdministratorAccess`, you can attach the JSON below to a dedicated IAM principal (recommended: a fresh user named `aws-cost-claude-deploy`) and use only that principal for `build_claude.sh` + `aws cloudformation deploy`. Keep your read-only `aws-cost-readonly-claude` user for the terminal skill.
+
+This policy is scoped to the specific stack name `aws-cost-claude`, the specific Lambda function name `aws-cost-claude-connector`, the specific secret name `aws_cost_claude_connector`, the role-name pattern CloudFormation auto-generates, and your S3 bucket. The only `Resource: "*"` entries are `cloudformation:ListStacks` / `cloudformation:ValidateTemplate`, which are account-level lookups. `iam:PassRole` is conditioned on `lambda.amazonaws.com` so the principal can only hand the role to Lambda, nothing else.
+
+**Two things to swap before pasting:**
+1. `REPLACE_LAMBDA_BUCKET` (two occurrences) → your S3 bucket name.
+2. If you change the stack name from `aws-cost-claude`, update the matching ARNs (`cloudformation:`, `iam:role/aws-cost-claude-*`, `lambda:function:aws-cost-claude-connector`, `secretsmanager:secret:aws_cost_claude_connector*`, `logs:log-group:/aws/lambda/aws-cost-claude-connector*`).
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "CloudFormationManageThisStack",
+      "Effect": "Allow",
+      "Action": [
+        "cloudformation:CreateStack",
+        "cloudformation:UpdateStack",
+        "cloudformation:DeleteStack",
+        "cloudformation:DescribeStacks",
+        "cloudformation:DescribeStackEvents",
+        "cloudformation:DescribeStackResource",
+        "cloudformation:DescribeStackResources",
+        "cloudformation:GetTemplate",
+        "cloudformation:GetTemplateSummary",
+        "cloudformation:CreateChangeSet",
+        "cloudformation:ExecuteChangeSet",
+        "cloudformation:DeleteChangeSet",
+        "cloudformation:DescribeChangeSet"
+      ],
+      "Resource": "arn:aws:cloudformation:*:*:stack/aws-cost-claude/*"
+    },
+    {
+      "Sid": "CloudFormationListAndValidate",
+      "Effect": "Allow",
+      "Action": [
+        "cloudformation:ListStacks",
+        "cloudformation:ValidateTemplate"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "S3UploadLambdaZip",
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject",
+        "s3:GetObject",
+        "s3:GetObjectVersion",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::REPLACE_LAMBDA_BUCKET",
+        "arn:aws:s3:::REPLACE_LAMBDA_BUCKET/*"
+      ]
+    },
+    {
+      "Sid": "IAMRoleForLambda",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateRole",
+        "iam:DeleteRole",
+        "iam:GetRole",
+        "iam:PutRolePolicy",
+        "iam:DeleteRolePolicy",
+        "iam:GetRolePolicy",
+        "iam:AttachRolePolicy",
+        "iam:DetachRolePolicy",
+        "iam:ListRolePolicies",
+        "iam:ListAttachedRolePolicies",
+        "iam:TagRole",
+        "iam:UntagRole",
+        "iam:ListRoleTags"
+      ],
+      "Resource": "arn:aws:iam::*:role/aws-cost-claude-*"
+    },
+    {
+      "Sid": "IAMPassRoleToLambda",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": "arn:aws:iam::*:role/aws-cost-claude-*",
+      "Condition": {
+        "StringEquals": {
+          "iam:PassedToService": "lambda.amazonaws.com"
+        }
+      }
+    },
+    {
+      "Sid": "LambdaManageFunction",
+      "Effect": "Allow",
+      "Action": [
+        "lambda:CreateFunction",
+        "lambda:DeleteFunction",
+        "lambda:GetFunction",
+        "lambda:GetFunctionConfiguration",
+        "lambda:UpdateFunctionCode",
+        "lambda:UpdateFunctionConfiguration",
+        "lambda:CreateFunctionUrlConfig",
+        "lambda:DeleteFunctionUrlConfig",
+        "lambda:GetFunctionUrlConfig",
+        "lambda:UpdateFunctionUrlConfig",
+        "lambda:AddPermission",
+        "lambda:RemovePermission",
+        "lambda:GetPolicy",
+        "lambda:TagResource",
+        "lambda:UntagResource",
+        "lambda:ListTags"
+      ],
+      "Resource": "arn:aws:lambda:*:*:function:aws-cost-claude-connector"
+    },
+    {
+      "Sid": "SecretsManagerManageBearerToken",
+      "Effect": "Allow",
+      "Action": [
+        "secretsmanager:CreateSecret",
+        "secretsmanager:DeleteSecret",
+        "secretsmanager:DescribeSecret",
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:UpdateSecret",
+        "secretsmanager:TagResource",
+        "secretsmanager:UntagResource"
+      ],
+      "Resource": "arn:aws:secretsmanager:*:*:secret:aws_cost_claude_connector*"
+    },
+    {
+      "Sid": "CloudWatchLogsManageGroup",
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:DeleteLogGroup",
+        "logs:DescribeLogGroups",
+        "logs:PutRetentionPolicy",
+        "logs:DeleteRetentionPolicy",
+        "logs:TagResource"
+      ],
+      "Resource": "arn:aws:logs:*:*:log-group:/aws/lambda/aws-cost-claude-connector*"
+    }
+  ]
+}
+```
 
 ## Hosted connector — deploy & install
 

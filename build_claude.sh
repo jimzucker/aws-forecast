@@ -22,8 +22,18 @@ cd "$(dirname "$0")"
 rm -rf target
 mkdir -p target/build
 
+# PEP 668 (Homebrew/Debian/Ubuntu Python ≥3.11) blocks `pip install` against
+# the system interpreter. Use a venv's pip — its `--target` install isn't
+# externally-managed. First run creates the venv; subsequent runs reuse.
+VENV=".venv-build"
+if [[ ! -x "$VENV/bin/pip" ]]; then
+    echo "[build_claude] First run: creating venv at $VENV" >&2
+    python3 -m venv "$VENV" >&2
+    "$VENV/bin/pip" install --quiet --upgrade pip >&2
+fi
+
 # Vendor python-dateutil (the one non-stdlib import in get_forecast.py).
-pip install --quiet --target target/build -r requirements.txt
+"$VENV/bin/pip" install --quiet --target target/build -r requirements.txt
 
 # Bundle source files alongside the deps.
 cp get_forecast.py claude_connector_handler.py target/build/
