@@ -190,7 +190,7 @@ def calc_forecast(boto3_session):
         }
     }
 
-    utcnow = datetime.datetime.utcnow()
+    utcnow = datetime.datetime.now(datetime.timezone.utc)
     today = utcnow.strftime('%Y-%m-%d') 
     first_day_of_month = utcnow.strftime('%Y-%m') + "-01"
     first_day_next_month = (utcnow + relativedelta(months=1)).strftime("%Y-%m-01")

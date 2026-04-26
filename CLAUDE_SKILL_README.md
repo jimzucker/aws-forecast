@@ -115,27 +115,67 @@ This removes the Lambda, IAM role, Function URL, and Secrets Manager entry. Then
 
 For Claude Code in a terminal:
 
-1. Configure a read-only AWS profile (one-time):
+1. **Create an IAM user** (or reuse an existing role) with **only** these four read-only actions. Anything else widens the blast radius unnecessarily — the skill needs no write or list-all permissions:
+
+   - `ce:GetCostAndUsage` — month-to-date and prior-month spend
+   - `ce:GetCostForecast` — current-month forecast
+   - `organizations:DescribeAccount` — resolves linked-account IDs to friendly names. **Optional:** if you skip this, account names display as 12-digit IDs (e.g. `760967184165`) instead of names like `prod-billing` — everything else still works.
+   - `sts:GetCallerIdentity` — used for connection sanity checks
+
+   Copy this JSON into a new IAM customer-managed policy (e.g. `aws-cost-readonly-claude`) and attach it to the user:
+
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {
+         "Sid": "ReadCostExplorer",
+         "Effect": "Allow",
+         "Action": [
+           "ce:GetCostAndUsage",
+           "ce:GetCostForecast"
+         ],
+         "Resource": "*"
+       },
+       {
+         "Sid": "ResolveAccountNames",
+         "Effect": "Allow",
+         "Action": "organizations:DescribeAccount",
+         "Resource": "*"
+       },
+       {
+         "Sid": "WhoAmI",
+         "Effect": "Allow",
+         "Action": "sts:GetCallerIdentity",
+         "Resource": "*"
+       }
+     ]
+   }
+   ```
+
+   Cost Explorer and Organizations APIs do not support resource-level permissions, so `Resource: "*"` is the only valid form for these actions.
+
+2. **Configure the profile locally** with the user's access key:
 
    ```bash
    aws configure --profile aws-cost-readonly
    ```
 
-   Attach an IAM policy granting only `ce:GetCostAndUsage`, `ce:GetCostForecast`, `organizations:DescribeAccount`, `sts:GetCallerIdentity`.
+   You can press Enter on the region prompt — `run.sh` defaults to `us-east-1` if the profile has no region set.
 
-2. (Optional) override the profile name:
+3. (Optional) override the profile name:
 
    ```bash
    export AWS_COST_PROFILE=my-other-profile
    ```
 
-3. The skill is auto-discovered from `.claude/skills/aws-cost-summary/` when Claude Code is started in this repo. To use system-wide, copy:
+4. The skill is auto-discovered from `.claude/skills/aws-cost-summary/` when Claude Code is started in this repo. To use system-wide, copy:
 
    ```bash
    mkdir -p ~/.claude/skills && cp -r .claude/skills/aws-cost-summary ~/.claude/skills/
    ```
 
-4. In Claude Code, ask a cost question — Claude will run `bash .claude/skills/aws-cost-summary/run.sh` and read the table.
+5. In Claude Code, ask a cost question — Claude will run `bash .claude/skills/aws-cost-summary/run.sh` and read the table. On the first run the script auto-creates `<repo>/.venv-skill/` and installs `boto3` + `python-dateutil` (PEP 668 blocks pip on system Python). Subsequent runs reuse the venv.
 
 The bundled `.claude/settings.json` denies AWS mutations (IAM, S3 delete, EC2 terminate, Lambda update, CFN deploy/delete, Secrets Manager mutations) for the duration of the session, so the skill cannot be coerced into a destructive action.
 
