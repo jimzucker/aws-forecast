@@ -1,7 +1,22 @@
 #!/usr/bin/env bash
+#
 # Wrapper invoked by the aws-cost-summary Claude skill.
 # Sets the AWS profile + region env vars get_forecast.py reads, then executes
 # it inside an isolated venv so we don't trip PEP 668 on system Pythons.
+#
+# Copyright 2026 Jim Zucker
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 set -euo pipefail
 
 export GET_FORECAST_AWS_PROFILE="${AWS_COST_PROFILE:-aws-cost-readonly}"
