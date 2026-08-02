@@ -21,22 +21,19 @@ References
   * Setup SNS: https://docs.aws.amazon.com/sns/latest/dg/sns-getting-started.html
   * Setup Slack as SNS subscriber: https://medium.com/cohealo-engineering/how-set-up-a-slack-channel-to-be-an-aws-sns-subscriber-63b4d57ad3ea
 
-Licensed to the Apache Software Foundation (ASF) under one
-or more contributor license agreements.  See the NOTICE file
-distributed with this work for additional information
-regarding copyright ownership.  The ASF licenses this file
-to you under the Apache License, Version 2.0 (the
-"License"); you may not use this file except in compliance
-with the License.  You may obtain a copy of the License at
+Copyright 2020 Jim Zucker
 
-  http://www.apache.org/licenses/LICENSE-2.0
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
-Unless required by applicable law or agreed to in writing,
-software distributed under the License is distributed on an
-"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-KIND, either express or implied.  See the License for the
-specific language governing permissions and limitations
-under the License.
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 """
 
 import sys
@@ -49,7 +46,6 @@ from botocore.exceptions import ClientError
 import json
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
-from base64 import b64decode
 
 logging.basicConfig(level = logging.INFO)
 logger = logging.getLogger()
@@ -73,9 +69,9 @@ def get_secret(sm_client):
         secret = sm_client.get_secret_value( SecretId=AWSGENIE_SECRET_MANAGER )["SecretString"]
     except Exception as e:
         if e.response['Error']['Code'] == 'InvalidRequestException':
-            logger.error("The request was invalid due to:", e)
+            logger.error("The request was invalid due to: %s", e)
         elif e.response['Error']['Code'] == 'InvalidParameterException':
-            logger.error("The request had invalid params:", e)
+            logger.error("The request had invalid params: %s", e)
 
     return secret
 
@@ -164,7 +160,7 @@ def display_output(boto3_session, message):
         teams_url = json.loads(secret)[TEAMS_SECRET_KEY_NAME]
         send_teams(teams_url, message)
     except Exception as e:
-        logger.info("Disabling Teams, URL not found", e)
+        logger.info("Disabling Teams, URL not found: %s", e)
 
     try:
         sns_arn=json.loads(secret)[SNS_SECRET_KEY_NAME]
@@ -191,16 +187,16 @@ def calc_forecast(boto3_session):
         }
     }
 
-    utcnow = datetime.datetime.utcnow()
+    utcnow = datetime.datetime.now(datetime.timezone.utc)
     today = utcnow.strftime('%Y-%m-%d') 
     first_day_of_month = utcnow.strftime('%Y-%m') + "-01"
     first_day_next_month = (utcnow + relativedelta(months=1)).strftime("%Y-%m-01")
     first_day_prior_month = (utcnow + relativedelta(months=-1)).strftime("%Y-%m-01")
 
-    logger.debug("today=",today)
-    logger.debug("first_day_of_month=",first_day_of_month)
-    logger.debug("first_day_next_month=",first_day_next_month)
-    logger.debug("first_day_prior_month=",first_day_prior_month)
+    logger.debug("today=%s", today)
+    logger.debug("first_day_of_month=%s", first_day_of_month)
+    logger.debug("first_day_next_month=%s", first_day_next_month)
+    logger.debug("first_day_prior_month=%s", first_day_prior_month)
 
 
     #Get total cost_and_usage
@@ -309,10 +305,15 @@ def calc_forecast(boto3_session):
             if amount_usage_prior_month > 0 :
                 variance = (amount_forecast-amount_usage_prior_month) / amount_usage_prior_month *100
 
-            try: 
-                account_name=org.describe_account(AccountId=linked_account)['Account']['Name']
-            except AWSOrganizationsNotInUseException as e:
-                account_name=linked_account
+            # Fall back to the raw account id if describe_account fails for
+            # any reason: AWS Organizations not in use, missing IAM permission
+            # (organizations:DescribeAccount), throttling, a closed account, etc.
+            try:
+                account_name = org.describe_account(
+                    AccountId=linked_account
+                )['Account']['Name']
+            except Exception:
+                account_name = linked_account
 
             result = {
                 "account_name": account_name,
@@ -376,9 +377,24 @@ def publish_forecast(boto3_session) :
         columns_displayed=os.environ['GET_FORECAST_COLUMNS_DISPLAYED']
         columns_displayed = columns_displayed.split(',')
 
-    account_width=12
+    account_width = 12
     if 'GET_FORECAST_ACCOUNT_COLUMN_WIDTH' in os.environ:
-        account_width=os.environ['GET_FORECAST_ACCOUNT_COLUMN_WIDTH']
+        raw_width = os.environ['GET_FORECAST_ACCOUNT_COLUMN_WIDTH']
+        try:
+            account_width = int(raw_width)
+        except (TypeError, ValueError):
+            logger.warning(
+                "GET_FORECAST_ACCOUNT_COLUMN_WIDTH=%r is not an integer; "
+                "falling back to default of %d",
+                raw_width, account_width,
+            )
+        if account_width <= 0:
+            logger.warning(
+                "GET_FORECAST_ACCOUNT_COLUMN_WIDTH=%r is not positive; "
+                "falling back to default of 12",
+                raw_width,
+            )
+            account_width = 12
 
     output = calc_forecast(boto3_session)
     formated_rows = format_rows(output, account_width)
@@ -408,7 +424,7 @@ def main():
         boto3_session = boto3.session.Session()
         if 'GET_FORECAST_AWS_PROFILE' in os.environ:
             profile_name=os.environ['GET_FORECAST_AWS_PROFILE']
-            logger.info("Setting AWS Proflie ="+profile_name)
+            logger.info("Setting AWS Profile=%s", profile_name)
             boto3_session = boto3.session.Session(profile_name=profile_name)
 
         try:
@@ -417,7 +433,7 @@ def main():
             raise e
 
     except Exception as e:
-        logger.error(e);
+        logger.exception("get_forecast main() failed: %s", e)
         sys.exit(1)
 
     sys.exit(0)

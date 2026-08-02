@@ -1,66 +1,95 @@
 # aws-forecast
-## User Story
-I found myself logging in daily check our AWS spend and change to prior month to keep an eye on our AWS bill and decided to create a script to slack it one time per day to save time.
 
-So I set out to automate this as a slack post daily to save time.  While doing this I found that the actual and forecast with % change from prior month that we see at the top of Cost Explorer are not directly available from the Cost Explorer API.  
+Reproduces the **forecast $** and **% change** numbers shown at the top of the AWS Cost Explorer UI (which the API does not expose directly) and posts them to Slack, Microsoft Teams, and/or SNS once a day.
 
-![Image of Cost Explorer](https://github.com/jimzucker/aws-forecast/blob/main/images/cost_explorer.png)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-## Acceptance Criteria
-1. Numbers generated include percent change must be consistent with the numbers in Cost Explorer UI.
-2. Application must produce a cleanly formatted one line output.
-3. Code must be written as python functions that we can re-use to integrate into a slack-bot.
-4. Post to slack if url is defined as an AWS secret (see below)
-5. Provide example Lambda function that posts to slack on a cron 1 time per day
+![Cost Explorer](https://github.com/jimzucker/aws-forecast/blob/main/images/cost_explorer.png)
 
-## Solution
-### AWS Architecture
+## Contents
+
+- [What it does](#what-it-does)
+- [Quick start](#quick-start)
+- [Configuration](#configuration)
+- [Deployment](#deployment)
+- [Skills (Claude / ChatGPT / Alexa)](#skills)
+- [Development](#development)
+- [License & disclaimer](#license--disclaimer)
+
+## What it does
+
+Once a day, calls AWS Cost Explorer for:
+
+- Month-to-date spend (current month, all linked accounts)
+- Forecasted total for the current month
+- Percent change vs. the prior month
+
+…then formats it as a fixed-width table and pushes it to whichever channels you've configured (Slack webhook, Teams webhook, SNS topic — all optional). Runs as both a Lambda function (scheduled) and a CLI tool (for testing).
+
+Sample output:
+
+![Sample Output](https://github.com/jimzucker/aws-forecast/blob/main/images/get_forecast_sample_output.png)
+
+## Quick start
+
+**Run the script locally** (requires AWS credentials with `ce:GetCostAndUsage`, `ce:GetCostForecast`, `organizations:DescribeAccount`, `sts:GetCallerIdentity`):
+
+```bash
+python3 get_forecast.py
+```
+
+For Lambda deployment, see [Deployment](#deployment).
+
+## Configuration
+
+| Env var | Default | Purpose |
+|---|---|---|
+| `GET_FORECAST_COLUMNS_DISPLAYED` | `"Account,Forecast,Change"` | Columns and order |
+| `GET_FORECAST_ACCOUNT_COLUMN_WIDTH` | `12` | Max width for account name |
+| `GET_FORECAST_AWS_PROFILE` | _(none)_ | Named AWS profile for CLI use |
+| `AWS_LAMBDA_FUNCTION_NAME` | _(auto-set)_ | Presence signals Lambda context |
+
+Slack/Teams/SNS destinations are read from a Secrets Manager entry named `awsgenie_secret_manager` whose value is JSON with keys `slack_url`, `teams_url`, `sns_arn` (any subset; missing keys disable that channel).
+
+## Deployment
+
+### CloudFormation
+
+`get_forecast_cf.yaml` provisions Lambda + IAM + EventBridge + Secrets Manager. It loads code from the public bucket `s3://jimzucker-github-getforecast/get_forecast.zip`.
+
+![CloudFormation Inputs](https://github.com/jimzucker/aws-forecast/blob/main/images/cloudformation_inputs.png)
+
+For more, see [LAMBDA_README.md](LAMBDA_README.md). For manual setup (no CloudFormation), see [MANUAL_SETUP_README.md](MANUAL_SETUP_README.md).
+
+### CI/CD: GitHub → S3
+
+`.github/workflows/s3-upload.yml` zips and uploads on push to `main`. Requires repo secrets `AWS_ACCESS_KEY` / `AWS_SECRET_KEY`. IAM permission details: [IAM_Configuration.md](IAM_Configuration.md).
+
+### AWS architecture
+
 ![AWS Architecture](https://github.com/jimzucker/aws-forecast/blob/main/images/aws_architecture.png)
 
-### Environment Variables
-We use these to make it compatible with running the same script from Lambda and the commandline for testing
+## Skills
 
-	GET_FORECAST_COLUMNS_DISPLAYED - specify columnns to display and the order 
-	    default: "Account,Forecast,Change"
+In addition to the daily Slack/Teams/SNS push, the same `calc_forecast()` engine powers three on-demand surfaces — each on its own branch with its own deploy artifacts and tests:
 
-	GET_FORECAST_ACCOUNT_COLUMN_WIDTH - max width for account name for formatting
-		default: 12
+| Surface | Branch | How to ask |
+|---|---|---|
+| **Claude** (web/desktop via Custom Connector + a terminal-mode Claude Code skill) | [`claudeskill`](https://github.com/jimzucker/aws-forecast/tree/claudeskill) | "What's my AWS bill this month?" |
+| **ChatGPT** (Custom GPT Action) | [`chatgptskill`](https://github.com/jimzucker/aws-forecast/tree/chatgptskill) | Same, in a Custom GPT |
+| **Alexa** (custom skill) | [`alexaskill`](https://github.com/jimzucker/aws-forecast/tree/alexaskill) | "Alexa, ask AWS Cost what is my current bill" |
 
-	AWS_LAMBDA_FUNCTION_NAME - set if running in lambda(Automatically set in Lambda)
-	GET_FORECAST_AWS_PROFILE - set for testing on command line to pick a profile from your credentials file
+Each surface is independent — a separate Lambda + IAM role + (where applicable) bearer token in your own AWS account. Setup walkthroughs live in `CLAUDE_SKILL_README.md`, `CHATGPT_SKILL_README.md`, and `ALEXA_SKILL_README.md` on their respective branches.
 
+## Development
 
-### Github Secrets for S3 Upload
-This application uses a Github Workflow to upload the get-forecast.py lambda function to Amazon S3. 
-To get this working properly, you need to configure your Github Secrets as follows, by providing it Credentials that have permission to access the S3 Bucket.
-For more information on giving permissions to access S3 Buckets through IAM Roles, see [IAM Configuration.md](https://github.com/jimzucker/aws-forecast/blob/main/IAM_Configuration.md)
-Go to your repository settings -> Secrets and Variables, and create these 2 secrets.
-	AWS_ACCESS_KEY = <AWS Access Key ID>
-	AWS_SECRET_KEY = <AWS Secret Access Key>
+- **Tests** — `pip install -r requirements-dev.txt && python3 -m unittest discover -v`. All AWS calls are mocked; no credentials needed. See [TESTING.md](TESTING.md).
+- **Project guide for Claude Code** — [CLAUDE.md](CLAUDE.md).
+- **AWS APIs used** — `get_cost_and_usage` (MTD + prior month) and `get_cost_forecast` (end-of-month projection). Both with `RECORD_TYPE != Credit/Refund` filter so credits don't distort the picture.
+- **Edge cases handled in `calc_forecast`** — weekend forecast failures (CE is sensitive to weekend start dates); new accounts / start-of-month with insufficient history (falls back to MTD); missing Organizations access (falls back to raw account ID).
 
-### Cloud Formation
-If you enter and slack URL and/or SNS and/or Teams URL it will publish in addition to logging.
+## License & disclaimer
 
-#### File: get_forecast_cf.yaml
-![Cloud Formation Inputs ](https://github.com/jimzucker/aws-forecast/blob/main/images/cloudformation_inputs.png)
+Licensed under the [Apache License 2.0](LICENSE). Copyright © 2020 Jim Zucker.
 
-	Note: The Cloud Formation loads the python script from a public S3 bucket, s3://jimzucker-github-getforecast/get_forecast.zip
-	
-### Sample Output
-![Sample Output of get_forecast](https://github.com/jimzucker/aws-forecast/blob/main/images/get_forecast_sample_output.png)
-	
-### Command line (for development/testing)
-```python3 get_forecast.py```
-
-### Technical Notes
-#### AWS API Used
-1. get_cost_forecast - used to get current month forecast. (note we exclude credits)
-2. get_cost_and_usage - used to get prior & current month actuals (note we exclude credits)
-
-#### Boundary conditions handled
-In testing I found several situations where the calls to get_cost_forecast would fail that we address in function calc_forecast:
-1. Weekends - there is a sensitivity to the start date being on a weekend
-2. Failure on new accounts or start of the month - on some days the calc fails due to insufficient data and we have to fall back to actuals
-
-#### Manual instructions
-If you dont want to use the Cloud Formation document, see these instructions: [Click here](https://github.com/jimzucker/aws-forecast/blob/main/MANUAL_SETUP_README.md)
+**This is provided "as is", without warranty of any kind.** The forecast figures come from AWS Cost Explorer's own forecast model and can be wrong, especially early in the month or for accounts with sparse history. **Do not use this output as the sole basis for budget decisions, contractual commitments, or chargeback calculations** — verify against your AWS bill before acting on it. The author is not liable for any cost overruns, missed forecasts, or downstream consequences. See sections 7 and 8 of the LICENSE for the full disclaimer.
