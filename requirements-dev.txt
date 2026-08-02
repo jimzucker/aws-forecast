@@ -1,0 +1,6 @@
+-r requirements.txt
+pytest>=7.4
+pytest-cov>=4.1
+pytest-mock>=3.12
+freezegun>=1.4
+pyyaml>=6.0

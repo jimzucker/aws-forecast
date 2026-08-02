@@ -5,21 +5,24 @@ on:
     branches:
       - main
 
+# OIDC federation: the job requests a short-lived token from GitHub and
+# exchanges it for AWS credentials by assuming a role — no long-lived
+# access keys stored in repo secrets. Role setup: see IAM_Configuration.md.
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   upload:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
-      - name: Install AWS CLI
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y awscli
+        uses: actions/checkout@v4
       - name: Configure AWS credentials
-        env:
-          AWS_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY }}
-          AWS_SECRET_KEY: ${{ secrets.AWS_SECRET_KEY }}
-        run: aws configure set aws_access_key_id $AWS_ACCESS_KEY && aws configure set aws_secret_access_key $AWS_SECRET_KEY && aws configure set region us-east-1
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
       - name: Zip get_forecast.py file
         run: zip get_forecast.zip get_forecast.py
       - name: Upload file to S3
