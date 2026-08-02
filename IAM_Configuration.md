@@ -1,44 +1,79 @@
-# Steps to create an IAM Role with permissions to write to this S3 bucket
-1) Go to the bucket that you want to share the permissions of, and get its ARN.
-2) Go to IAM -> Roles -> Create Role -> AWS Account -> Another AWS Account 
-    And enter the Account ID of the account you want to give permissions to.
-    Require External ID, and create a unique password or phrase you can share with this user.
-3) Create a Policy
-    Service - S3
-    Access Level - PutObject, GetObject, DeleteObject, and ListBucket. If your bucket has ACL's, then you also need PutObjectACL and GetObjectACL.
-    Resources - Specify ARN of the S3 Bucket, as well as the object that will be being replaced.
-    Attach the policy to a role.
-    Give the role a name and a description, and make sure that the trusted relationships of the role enables the STSAssumeRole Action to the Principal AWS Account, and create role
-4) Share your external ID with the third party, as well as the ARN of the IAM Role that was created.
-5) Ask the third party for the ARN of their IAM USER that will be ASSUMING your ROLE. Go to the role you created, go to its Trust Relationship, and change the Principal from the root of their AWS account the ARN of the IAM user that they have created. ROOT USERS CANNOT ASSUME ROLES. 
+# IAM configuration for the GitHub → S3 upload workflow
 
+`.github/workflows/s3-upload.yml` uploads `get_forecast.zip` to S3 on every
+push to `main`. It authenticates with **GitHub OIDC federation** — the job
+assumes an IAM role using a short-lived token issued by GitHub, so **no AWS
+access keys are stored in the repository**.
 
+One-time setup in the AWS account that owns the bucket:
 
-The trust Policy of your S3 Bucket should look like this.
+## 1. Create the GitHub OIDC identity provider
 
-```
+IAM → Identity providers → Add provider:
+
+- Provider type: **OpenID Connect**
+- Provider URL: `https://token.actions.githubusercontent.com`
+- Audience: `sts.amazonaws.com`
+
+(Skip if the account already has this provider — an account can only have one.)
+
+## 2. Create the deploy role
+
+IAM → Roles → Create role → **Web identity**, choosing the provider above.
+The trust policy should restrict the role to this repository's `main` branch:
+
+```json
 {
     "Version": "2012-10-17",
-    "Id": "AllowOtherAWSAccountToAccessS3Bucket",
     "Statement": [
         {
-            "Sid": "AllowAccess",
             "Effect": "Allow",
             "Principal": {
-                "AWS": "arn:aws:iam::<ACCOUNT_ID>:user/<XYZ>"
+                "Federated": "arn:aws:iam::<ACCOUNT_ID>:oidc-provider/token.actions.githubusercontent.com"
             },
-            "Action": [
-                "s3:PutObject",
-                "s3:GetObject",
-                "s3:DeleteObject",
-                "s3:ListBucket"
-            ],
-            "Resource": [
-                "ARN OF THE BUCKET HERE/*",
-                "ARN OF THE BUCKET HERE"         
-            ]
+            "Action": "sts:AssumeRoleWithWebIdentity",
+            "Condition": {
+                "StringEquals": {
+                    "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+                    "token.actions.githubusercontent.com:sub": "repo:jimzucker/aws-forecast:ref:refs/heads/main"
+                }
+            }
         }
     ]
 }
 ```
 
+Attach an inline permissions policy scoped to the one object the workflow
+writes:
+
+```json
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "UploadLambdaZip",
+            "Effect": "Allow",
+            "Action": "s3:PutObject",
+            "Resource": "arn:aws:s3:::jimzucker-github-getforecast/get_forecast.zip"
+        }
+    ]
+}
+```
+
+## 3. Point the workflow at the role
+
+Repository → Settings → Secrets and variables → Actions → New repository
+secret:
+
+- Name: `AWS_DEPLOY_ROLE_ARN`
+- Value: the ARN of the role from step 2 (e.g.
+  `arn:aws:iam::<ACCOUNT_ID>:role/github-aws-forecast-deploy`)
+
+The old `AWS_ACCESS_KEY` / `AWS_SECRET_KEY` secrets are no longer used and
+should be deleted, and the IAM user that owned those keys can be removed.
+
+## Forking this repo?
+
+Change `repo:jimzucker/aws-forecast` in the trust policy to your fork, and
+point the workflow's `aws s3 cp` destination (and this policy's `Resource`)
+at your own bucket.

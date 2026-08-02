@@ -63,7 +63,7 @@ For more, see [LAMBDA_README.md](LAMBDA_README.md). For manual setup (no CloudFo
 
 ### CI/CD: GitHub → S3
 
-`.github/workflows/s3-upload.yml` zips and uploads on push to `main`. Requires repo secrets `AWS_ACCESS_KEY` / `AWS_SECRET_KEY`. IAM permission details: [IAM_Configuration.md](IAM_Configuration.md).
+`.github/workflows/s3-upload.yml` zips and uploads on push to `main`. Authenticates via GitHub OIDC federation (no stored AWS keys) — one-time role setup: [IAM_Configuration.md](IAM_Configuration.md).
 
 ### AWS architecture
 

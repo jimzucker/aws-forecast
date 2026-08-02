@@ -1,6 +1,6 @@
 # Runtime dependencies for the Lambda zip.
 #
-# AWS Lambda's python3.12 runtime ships boto3, botocore, urllib3, and the
+# AWS Lambda's python3.13 runtime ships boto3, botocore, urllib3, and the
 # usual transitive deps (six, jmespath, etc.) — pinning them here only
 # creates conflicts and pulls in stale CVEs. Keep this file minimal: list
 # only what get_forecast.py imports that the runtime does NOT already

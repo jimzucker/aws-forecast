@@ -69,5 +69,5 @@ The `logging_enabled()` context manager in `_helpers.py` is used to assert log o
 ## Deployment
 
 - **CloudFormation**: `get_forecast_cf.yaml` provisions Lambda + IAM + EventBridge + Secrets Manager. Loads code from public S3: `s3://jimzucker-github-getforecast/get_forecast.zip`.
-- **CI/CD**: `.github/workflows/s3-upload.yml` zips and uploads on push to `main`. Requires GitHub secrets `AWS_ACCESS_KEY` / `AWS_SECRET_KEY`.
-- **Lambda runtime**: Python 3.12. Only non-stdlib runtime dependency is `python-dateutil` (for `relativedelta`).
+- **CI/CD**: `.github/workflows/s3-upload.yml` zips and uploads on push to `main`. Authenticates via GitHub OIDC federation (role ARN in the `AWS_DEPLOY_ROLE_ARN` repo secret); setup in `IAM_Configuration.md`.
+- **Lambda runtime**: Python 3.13. Only non-stdlib runtime dependency is `python-dateutil` (for `relativedelta`).
